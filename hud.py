@@ -81,7 +81,7 @@ def draw_hud(surf, game, current_zone_id=None):
 
     # 열쇠
     if inv.key:
-        draw_text(surf, f, f"열쇠: {inv.key.zone_id}구역 탈출구 / 코드 {inv.key.code}", (260, 62), GOLD)
+        draw_text(surf, f, f"열쇠: {inv.key.zone_id}구역 탈출구", (260, 62), GOLD)
     else:
         draw_text(surf, f, "열쇠: 없음 (괴물을 처치해서 얻기)", (260, 62), GRAY)
 

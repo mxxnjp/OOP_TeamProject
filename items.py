@@ -129,11 +129,10 @@ class Bow(Weapon):
 @dataclass
 class Key:
     zone_id: int   # 이 열쇠로 열 수 있는 탈출구가 있는 구역
-    code: str      # 열쇠에 적힌 비밀번호
 
     @classmethod
     def random(cls, rng=random):
-        return cls(rng.randint(1, ZONE_COUNT), f"{rng.randint(0, 9999):04d}")
+        return cls(rng.randint(1, ZONE_COUNT))
 
 
 # =====================================================================
@@ -249,7 +248,7 @@ class KeyPickup(Pickup):
         if player.inventory.key is not None:
             return None   # 열쇠는 하나만 소지
         player.inventory.key = self.key
-        return f"열쇠 획득! [{self.key.zone_id}구역 / 코드 {self.key.code}]"
+        return f"열쇠 획득! [{self.key.zone_id}구역 탈출구]"
 
     def draw(self, surf, font):
         r = self.rect()
