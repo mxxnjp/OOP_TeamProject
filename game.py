@@ -5,7 +5,7 @@ from settings import (SCREEN_W, SCREEN_H, FPS, TITLE, FONT_NAMES, PLAYER_LIVES,
                       NIGHT_DURATION, PURPLE, GREEN, RED, WHITE)
 from world import World
 from entities import Player
-from scenes import CenterScene, ZoneScene, TransitionScene, EndScene
+from scenes import CenterScene, ZoneScene, TransitionScene, EndScene, PauseScene
 
 
 class Game:
@@ -98,6 +98,9 @@ class Game:
         for event in events:
             if event.type == pygame.QUIT:
                 self.running = False
+            elif (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE
+                  and self.scene.pausable):
+                self.change_scene(PauseScene(self, self.scene))
             else:
                 self.scene.handle_event(event)
         scene = self.scene

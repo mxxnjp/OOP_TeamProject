@@ -17,6 +17,7 @@ RIGHT_CLICK = 3
 
 class Scene:
     advances_clock = True   # True면 이 화면에 있는 동안 밤 타이머가 흐른다
+    pausable = False        # True면 ESC로 일시정지 메뉴를 열 수 있다
 
     def __init__(self, game):
         self.game = game
@@ -35,6 +36,7 @@ class Scene:
 # 중앙(집): 전체 지도 화면. 안전지대 + 체력 회복. 구역을 우클릭하면 입장
 # =====================================================================
 class CenterScene(Scene):
+    pausable = True
     MINI_SCALE = 10
 
     def __init__(self, game):
@@ -108,6 +110,7 @@ class CenterScene(Scene):
 # 구역(서브 미로) 화면: 탐험, 파밍, 전투, 탈출
 # =====================================================================
 class ZoneScene(Scene):
+    pausable = True
     def __init__(self, game, zone):
         super().__init__(game)
         self.zone = zone
@@ -244,6 +247,70 @@ class TransitionScene(Scene):
                   GRAY, center=True)
 
 
+
+
+# =====================================================================
+# 일시정지 메뉴 (ESC). 멈춘 화면을 뒤에 어둡게 깔고 메뉴를 띄운다
+# =====================================================================
+class PauseScene(Scene):
+    advances_clock = False   # 일시정지 중에는 밤 타이머도 멈춤
+
+    def __init__(self, game, paused_scene):
+        super().__init__(game)
+        self.paused_scene = paused_scene
+        self.options = [
+            ("계속하기", self.resume),
+            ("처음부터 다시", self.game.reset),
+            ("게임 종료", self.quit),
+        ]
+        self.selected = 0
+        self.shade = pygame.Surface((SCREEN_W, SCREEN_H), pygame.SRCALPHA)
+        self.shade.fill((0, 0, 0, 170))
+
+    def resume(self):
+        self.game.change_scene(self.paused_scene)
+
+    def quit(self):
+        self.game.running = False
+
+    def option_rect(self, index):
+        rect = pygame.Rect(0, 0, 260, 48)
+        rect.center = (SCREEN_W // 2, SCREEN_H // 2 - 10 + index * 62)
+        return rect
+
+    def handle_event(self, event):
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+                self.resume()
+            elif event.key in (pygame.K_UP, pygame.K_w):
+                self.selected = (self.selected - 1) % len(self.options)
+            elif event.key in (pygame.K_DOWN, pygame.K_s):
+                self.selected = (self.selected + 1) % len(self.options)
+            elif event.key in (pygame.K_RETURN, pygame.K_KP_ENTER, pygame.K_SPACE):
+                self.options[self.selected][1]()
+        elif event.type == pygame.MOUSEMOTION:
+            for i in range(len(self.options)):
+                if self.option_rect(i).collidepoint(event.pos):
+                    self.selected = i
+        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            for i, (_, action) in enumerate(self.options):
+                if self.option_rect(i).collidepoint(event.pos):
+                    action()
+                    return
+
+    def draw(self, surf):
+        self.paused_scene.draw(surf)   # 멈춘 게임 화면을 그대로 뒤에 보여줌
+        surf.blit(self.shade, (0, 0))
+        g = self.game
+        draw_text(surf, g.font_big, "일시정지", (SCREEN_W // 2, SCREEN_H // 2 - 100), WHITE, center=True)
+        for i, (label, _) in enumerate(self.options):
+            rect = self.option_rect(i)
+            active = i == self.selected
+            pygame.draw.rect(surf, (60, 60, 75) if active else (30, 30, 40), rect, border_radius=8)
+            pygame.draw.rect(surf, YELLOW if active else GRAY, rect, 2, border_radius=8)
+            draw_text(surf, g.font, label, rect.center, YELLOW if active else WHITE, center=True)
+        draw_text(surf, g.font_small, "↑↓/마우스: 선택   Enter/클릭: 확인   ESC: 계속하기",
+                  (SCREEN_W // 2, SCREEN_H // 2 + 175), GRAY, center=True)
 
 
 # =====================================================================
