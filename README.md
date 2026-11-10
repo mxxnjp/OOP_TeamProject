@@ -9,7 +9,7 @@ python main.py
 2. **낮**: 구역(1~4)을 **우클릭**해서 입장 → 미로 탐험하면서 창/활/물약 줍기 (지나가면 자동 습득)
 3. 구역 입구(`H` 칸)로 돌아오면 중앙으로 복귀. 중앙은 안전지대이고 체력이 회복됨
 4. 중앙에서 **N** → 안내 화면 → **밤** (미로 재생성, 각 구역에 괴물 등장, 시야 제한)
-5. 괴물을 무기로만 처치 가능 → 죽으면 **열쇠**(구역 번호 + 코드)를 떨어뜨림
+5. 괴물을 무기로만 처치 가능 → 죽으면 **열쇠**(탈출구가 있는 구역 번호)를 떨어뜨림
 6. 열쇠에 적힌 구역의 `EXIT` 칸으로 가면 탈출 성공 (다른 구역의 탈출구는 안 열림)
 7. 밤이 끝나면(150초) 다시 낮 → 새 무기/물약 생성
 8. 사망 시 목숨 -1 후 중앙에서 부활, 목숨 3개 다 잃으면 GAME OVER → R로 전체 리셋
@@ -30,7 +30,7 @@ python main.py
 |---|---|---|
 | `settings.py` | – | 밸런스 수치·색상·화면 크기 상수 (여기만 고치면 밸런스 조정) |
 | `game.py` | `Game` | 메인 루프, 낮/밤 타이머, 화면 전환, 사망/승리 처리 |
-| `scenes.py` | `Scene` → `CenterScene`, `ZoneScene`, `TransitionScene`, `EndScene` | 화면별 입력·업데이트·그리기 |
+| `scenes.py` | `Scene` → `CenterScene`, `ZoneScene`, `TransitionScene`, `PauseScene`, `EndScene` | 화면별 입력·업데이트·그리기 |
 | `world.py` | `Maze`, `Zone`, `World` | 미로 생성(백트래킹)·BFS 길찾기, 구역별 아이템/괴물 관리 |
 | `entities.py` | `Entity` → `Player`, `Monster` | 체력·이동·공격, 괴물 AI(추적/배회/근접/독침) |
 | `items.py` | `Weapon` → `Spear`, `Bow` / `Pickup` → `WeaponPickup`, `PotionPickup`, `KeyPickup` / `Key`, `Inventory` | 무기·아이템·인벤토리 |
@@ -38,7 +38,7 @@ python main.py
 | `hud.py` | – | 상단 HUD(목숨, 체력 10칸, 슬롯, 열쇠, 전체 지도) |
 
 ### OOP 포인트
-- **상속**: `Entity` → `Player`/`Monster`, `Weapon` → `Spear`/`Bow`, `Pickup` → 3종, `Scene` → 4종
+- **상속**: `Entity` → `Player`/`Monster`, `Weapon` → `Spear`/`Bow`, `Pickup` → 3종, `Scene` → 5종
 - **다형성**: `weapon.attack()`, `pickup.apply()`, `scene.update()/draw()`를 같은 이름으로 호출해도 클래스마다 다르게 동작
 - **추상 클래스**: `Weapon`, `Pickup`은 `ABC` + `@abstractmethod`
 - **캡슐화**: 인벤토리 조작은 `Inventory` 메서드로만 (`add_weapon`, `cycle`, `select_slot`)
@@ -53,7 +53,6 @@ python main.py
 - 이미지 스프라이트로 교체 (`draw()` 메서드만 바꾸면 됨)
 - 밤 전환 안내 영상 (`TransitionScene` 자리)
 - 게임 시작 및 엔딩 화면 or 스토리?
-- 탈출구에서 열쇠 코드 입력 UI
 - 효과음 / 배경음
 
 ## 컨셉변경
