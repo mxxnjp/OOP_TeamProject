@@ -3,7 +3,7 @@ import pygame
 
 from settings import (SCREEN_W, SCREEN_H, HUD_HEIGHT, TILE, ZONE_LAYOUT, MAZE_COLS, MAZE_ROWS,
                       TRANSITION_TIME, NIGHT_VISION_RADIUS, CENTER_REGEN_PER_SEC,
-                      ZONE_BUILDING_IMAGES,
+                      ZONE_BUILDING_IMAGES, CENTER_IMAGE,
                       CENTER_NAME, FINAL_ZONE_NAME,
                       BG, BLACK, WHITE, GRAY, YELLOW, GOLD, GREEN, PURPLE, HOME_COLOR, DOOR_COLOR)
 from hud import draw_hud, draw_message, draw_text
@@ -43,6 +43,7 @@ class CenterScene(Scene):
     pausable = True
     MINI_SCALE = 10
     BUILDING_EXTRA_W = 130   # 건물 그림을 미로 칸보다 얼마나 더 넓게 그릴지(px)
+    CENTER_BOX = (160, 108)  # 가운데 과방 그림 최대 크기(px)
 
     def __init__(self, game):
         super().__init__(game)
@@ -67,6 +68,14 @@ class CenterScene(Scene):
                 scaled = pygame.transform.smoothscale(img, (int(img.get_width() * k), int(img.get_height() * k)))
                 self.zone_rects[zid] = scaled.get_rect(center=box.center)   # 클릭/테두리도 그림 크기에 맞춤
                 self.building_imgs[zid] = scaled
+
+        # 가운데 과방 그림 (없으면 파란 원)
+        self.center_img = None
+        img = load_image(CENTER_IMAGE)
+        if img:
+            k = min(self.CENTER_BOX[0] / img.get_width(), self.CENTER_BOX[1] / img.get_height())
+            self.center_img = pygame.transform.smoothscale(img, (int(img.get_width() * k),
+                                                                 int(img.get_height() * k)))
 
     def handle_event(self, event):
         g = self.game
@@ -122,13 +131,27 @@ class CenterScene(Scene):
             elif g.is_night and zone.monsters:
                 label += f"  - {zone.monster_name} 출몰"
             color = GOLD if inv.has_key_for(zid) else (PURPLE if g.is_night else WHITE)
-            draw_text(surf, g.font_small, label, (rect.x, rect.y - 22), color)
+            img = g.font_small.render(label, True, color)
+            if ZONE_LAYOUT[zid][0] == 0:       # 왼쪽 건물: 이름을 왼쪽 정렬
+                surf.blit(img, img.get_rect(bottomleft=(rect.x, rect.y - 4)))
+            else:                              # 오른쪽 건물: 가운데 과방과 안 겹치게 오른쪽 정렬
+                surf.blit(img, img.get_rect(bottomright=(rect.right, rect.y - 4)))
 
-        pygame.draw.circle(surf, HOME_COLOR, self.home_pos, 58)
-        pygame.draw.circle(surf, WHITE, self.home_pos, 58, 2)
-        draw_text(surf, g.font_small, CENTER_NAME, (self.home_pos[0], self.home_pos[1] - 12), WHITE, center=True)
-        draw_text(surf, g.font_small, "안전지대 · 회복", (self.home_pos[0], self.home_pos[1] + 14),
-                  WHITE, center=True)
+        if self.center_img:
+            r = self.center_img.get_rect(center=self.home_pos)
+            surf.blit(self.center_img, r)
+            text = "안전지대 · 회복"
+            img = g.font_tiny.render(text, True, WHITE)
+            tag = img.get_rect(midtop=(r.centerx, r.bottom - 2))
+            pygame.draw.rect(surf, (20, 26, 22), tag.inflate(10, 4), border_radius=4)
+            surf.blit(img, tag)
+        else:
+            pygame.draw.circle(surf, HOME_COLOR, self.home_pos, 58)
+            pygame.draw.circle(surf, WHITE, self.home_pos, 58, 2)
+            draw_text(surf, g.font_small, CENTER_NAME, (self.home_pos[0], self.home_pos[1] - 12), WHITE,
+                      center=True)
+            draw_text(surf, g.font_small, "안전지대 · 회복", (self.home_pos[0], self.home_pos[1] + 14),
+                      WHITE, center=True)
 
         exit_zone = next((z for z in g.world.zones.values() if z.exit_open), None)
         if exit_zone:
@@ -243,7 +266,10 @@ class ZoneScene(Scene):
             self._draw_darkness(surf)
 
         draw_hud(surf, g, current_zone_id=zone.id)
-        draw_text(surf, g.font_small, zone.name, (8, HUD_HEIGHT + 4), WHITE)
+        name = g.font_small.render(zone.name, True, WHITE)   # 밝은 배경에서도 보이게 어두운 바탕
+        tag = name.get_rect(topleft=(8, HUD_HEIGHT + 4))
+        pygame.draw.rect(surf, (20, 20, 28), tag.inflate(8, 2), border_radius=4)
+        surf.blit(name, tag)
         draw_message(surf, g, SCREEN_H - 24)
 
     def _draw_darkness(self, surf):

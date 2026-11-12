@@ -56,9 +56,14 @@ python main.py
 - 규칙: 바깥 테두리는 전부 벽 / 모든 길이 이어져 있어야 함
 - 그림(테마): `themes.py`에서 아트 이미지의 어느 부분을 바닥·책장·장식으로 쓸지 좌표로 지정 → `ZONE_THEMES`에 등록
 - 맵 파일이 없는 건물은 랜덤 미로 + 단색 그림
-- 현재: 1. 도서관 = `maps/library.txt` + `tiles/library_art.png`
-- 과방 지도의 건물 그림: `assets/buildings/건물.png` (배경 투명 PNG) → `settings.ZONE_BUILDING_IMAGES`에 등록. 없으면 미로 미리보기
-  - 현재: 1. 도서관 = `buildings/library.png`
+- 테마 종류 (`themes.py`)
+  - `ArtTheme`: 그림에서 바닥·벽 조각을 잘라 타일로 깔기 → 1. 도서관 (`maps/library.txt` + `tiles/library_art.png`)
+  - `ImageTheme`: 미로 그림 한 장을 그대로 배경으로 (800x544로 줄여 저장), 벽/길은 맵 파일이 판정
+    → 2. 학생회관 (`maps/student_hall.txt` + `tiles/student_hall_maze.png`)
+    → 3. 명수당 (`maps/myeongsudang.txt` + `tiles/myeongsudang_maze.png`)
+    → 4. 기숙사 (`maps/dormitory.txt` + `tiles/dormitory_maze.png`, 학생회관과 같은 배치라 맵 공유)
+  - 그림 미로의 맵 파일은 색으로 자동 판정 후 START→GOAL 연결을 확인해 만든 것. 그림과 반 칸 정도 어긋나는 곳은 맵 파일을 직접 고치면 됨
+- 과방 지도의 건물 그림: `assets/buildings/건물.png` (배경 투명 PNG) → `settings.ZONE_BUILDING_IMAGES`, 가운데 과방 문은 `settings.CENTER_IMAGE`
 
 ## 현재 수치 (`settings.py`)
 - 플레이어 체력 10, 목숨 3 / 괴물 체력 15 / **보스 체력 40**

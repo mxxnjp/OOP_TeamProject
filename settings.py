@@ -20,9 +20,12 @@ FINAL_ZONE_ID = 5               # 최종 스테이지(구역 4개 키를 다 모
 MAZE_CHANGES_EACH_NIGHT = False
 # 직접 디자인한 맵 파일(assets/ 기준). 없는 건물은 랜덤 미로를 쓴다.
 #   맵 기호: # 벽   . 길   H 입구   E 탈출구   P 화분  T 책상  L 조명 (장식은 지나갈 수 없음)
-ZONE_MAP_FILES = {1: "maps/library.txt"}
+ZONE_MAP_FILES = {1: "maps/library.txt", 2: "maps/student_hall.txt",
+                  3: "maps/myeongsudang.txt", 4: "maps/dormitory.txt"}
 # 과방(중앙) 지도에서 미로 미리보기 대신 보여줄 건물 그림(assets/ 기준). 없는 건물은 미로 미리보기
-ZONE_BUILDING_IMAGES = {1: "buildings/library.png"}
+ZONE_BUILDING_IMAGES = {1: "buildings/library.png", 2: "buildings/student_hall.png",
+                        3: "buildings/myeongsudang.png", 4: "buildings/dormitory.png"}
+CENTER_IMAGE = "buildings/center_door.png"   # 지도 가운데 과방 그림 (없으면 파란 원)
 
 # ---------------- 테마(이름) : 여기만 바꾸면 게임 안 글자가 다 바뀜 ----------------
 CENTER_NAME = "과방 (교양관)"

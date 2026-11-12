@@ -132,6 +132,19 @@ class ArtTheme(Theme):
         return surf
 
 
+class ImageTheme(Theme):
+    """미로 그림 한 장을 통째로 배경으로 쓰는 테마. 벽/길 판정은 맵 파일이 따로 담당."""
+
+    def __init__(self, image_file):
+        self.image_file = image_file
+
+    def render(self, maze, decor, scale=TILE):
+        img = load_image(self.image_file)
+        if img is None:                              # 그림이 없으면 기본 테마로
+            return super().render(maze, decor, scale)
+        return pygame.transform.smoothscale(img, (maze.cols * scale, maze.rows * scale))
+
+
 # ---------------------------------------------------------------------
 # 건물별 테마. 잘라낼 좌표는 원본 아트(1448x1086) 기준 (x, y, 너비, 높이)
 # ---------------------------------------------------------------------
@@ -153,4 +166,10 @@ LIBRARY_THEME = ArtTheme("tiles/library_art.png", {
 DECOR_SYMBOLS = {"P": "plant", "T": "table", "L": "lamp"}
 
 DEFAULT_THEME = Theme()
-ZONE_THEMES = {1: LIBRARY_THEME}   # 구역 번호 -> 테마. 없는 구역은 DEFAULT_THEME
+# 구역 번호 -> 테마. 없는 구역은 DEFAULT_THEME
+ZONE_THEMES = {
+    1: LIBRARY_THEME,                                   # 도서관: 아트에서 잘라낸 타일
+    2: ImageTheme("tiles/student_hall_maze.png"),      # 학생회관: 미로 그림 통째로
+    3: ImageTheme("tiles/myeongsudang_maze.png"),      # 명수당
+    4: ImageTheme("tiles/dormitory_maze.png"),         # 기숙사
+}

@@ -86,9 +86,12 @@ def draw_hud(surf, game, current_zone_id=None):
         selected = weapon is not None and inv.current == weapon.name
         pygame.draw.rect(surf, (50, 50, 60), r, border_radius=5)
         pygame.draw.rect(surf, YELLOW if selected else GRAY, r, 2, border_radius=5)
-        text = weapon.label() if weapon else f"{name} (없음)"
         draw_text(surf, f, key_label, (r.x + 5, r.y + 2), GRAY)
         icon = _slot_icon(surf, r, ("spear", "bow")[int(key_label) - 1], owned=weapon is not None)
+        if weapon:
+            text = weapon.label()
+        else:
+            text = "없음" if icon else f"{name} (없음)"   # 아이콘이 있으면 짧게
         draw_text(surf, f, text, (r.centerx + (16 if icon else 0), r.centery),
                   WHITE if weapon else GRAY, center=True)
         x += 100
