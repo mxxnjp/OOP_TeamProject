@@ -2,11 +2,12 @@
 import pygame
 
 from settings import (SCREEN_W, SCREEN_H, HUD_HEIGHT, TILE, ZONE_LAYOUT, MAZE_COLS, MAZE_ROWS,
-                      ZONE_COUNT, TRANSITION_TIME, NIGHT_VISION_RADIUS, CENTER_REGEN_PER_SEC,
+                      TRANSITION_TIME, NIGHT_VISION_RADIUS, CENTER_REGEN_PER_SEC,
+                      ZONE_BUILDING_IMAGES,
                       CENTER_NAME, FINAL_ZONE_NAME,
-                      BG, BLACK, WHITE, GRAY, YELLOW, GOLD, GREEN, PURPLE, HOME_COLOR, DOOR_COLOR,
-                      BOSS_COLOR)
+                      BG, BLACK, WHITE, GRAY, YELLOW, GOLD, GREEN, PURPLE, HOME_COLOR, DOOR_COLOR)
 from hud import draw_hud, draw_message, draw_text
+from themes import load_image
 
 MOVE_KEYS = {
     pygame.K_w: (0, -1), pygame.K_UP: (0, -1),
@@ -41,6 +42,7 @@ class Scene:
 class CenterScene(Scene):
     pausable = True
     MINI_SCALE = 10
+    BUILDING_EXTRA_W = 130   # 건물 그림을 미로 칸보다 얼마나 더 넓게 그릴지(px)
 
     def __init__(self, game):
         super().__init__(game)
@@ -53,9 +55,18 @@ class CenterScene(Scene):
             y = HUD_HEIGHT + margin_y if ly == 0 else SCREEN_H - margin_y - h
             self.zone_rects[zid] = pygame.Rect(x, y, w, h)
         self.home_pos = (SCREEN_W // 2, HUD_HEIGHT + (SCREEN_H - HUD_HEIGHT) // 2)
-        # 최종 스테이지 건물: 위쪽 두 건물 사이
-        self.final_rect = pygame.Rect(0, 0, 120, 76)
-        self.final_rect.midtop = (SCREEN_W // 2, HUD_HEIGHT + 56)
+
+        # 건물 그림이 있으면 미로 미리보기 대신 사용 (비율 유지).
+        # 그림은 미로 칸보다 가로로 BUILDING_EXTRA_W 만큼 넓은 영역까지 키울 수 있다.
+        self.building_imgs = {}
+        for zid, rect in self.zone_rects.items():
+            img = load_image(ZONE_BUILDING_IMAGES.get(zid))
+            if img:
+                box = rect.inflate(self.BUILDING_EXTRA_W, 0)
+                k = min(box.width / img.get_width(), box.height / img.get_height())
+                scaled = pygame.transform.smoothscale(img, (int(img.get_width() * k), int(img.get_height() * k)))
+                self.zone_rects[zid] = scaled.get_rect(center=box.center)   # 클릭/테두리도 그림 크기에 맞춤
+                self.building_imgs[zid] = scaled
 
     def handle_event(self, event):
         g = self.game
@@ -64,12 +75,6 @@ class CenterScene(Scene):
                 if rect.collidepoint(event.pos):
                     g.enter_zone(zid)
                     return
-            if self.final_rect.collidepoint(event.pos):
-                if g.all_keys_collected:
-                    g.enter_final_stage()
-                else:
-                    g.notify(f"잠겨 있다. 키 {ZONE_COUNT}개가 필요하다. "
-                             f"({g.player.inventory.key_count}/{ZONE_COUNT})")
         elif event.type == pygame.KEYDOWN and event.key == pygame.K_3:
             g.notify(g.player.drink_potion())
 
@@ -88,20 +93,29 @@ class CenterScene(Scene):
         mouse = pygame.mouse.get_pos()
         for zid, rect in self.zone_rects.items():
             zone = g.world.zones[zid]
-            # 과방에서 각 건물 입구로 이어지는 통로
-            ex, ey = zone.entrance
-            pygame.draw.line(surf, HOME_COLOR, self.home_pos,
-                             (rect.x + ex * s + s // 2, rect.y + ey * s + s // 2), 6)
-        pygame.draw.line(surf, BOSS_COLOR, self.home_pos, self.final_rect.midbottom, 6)
+            # 과방에서 각 건물로 이어지는 길
+            if zid in self.building_imgs:
+                target = rect.midbottom if ZONE_LAYOUT[zid][1] == 0 else rect.midtop
+            else:
+                ex, ey = zone.entrance
+                target = (rect.x + ex * s + s // 2, rect.y + ey * s + s // 2)
+            pygame.draw.line(surf, HOME_COLOR, self.home_pos, target, 6)
 
         for zid, rect in self.zone_rects.items():
             zone = g.world.zones[zid]
-            surf.blit(zone.surface(s), rect)
-            if zone.exit_open:
-                dx, dy = zone.exit_door
-                pygame.draw.rect(surf, GREEN, (rect.x + dx * s, rect.y + dy * s, s, s))
             hover = rect.collidepoint(mouse)
-            pygame.draw.rect(surf, YELLOW if hover else GRAY, rect, 3 if hover else 1)
+            if zid in self.building_imgs:
+                surf.blit(self.building_imgs[zid], rect)
+                if hover:
+                    pygame.draw.rect(surf, YELLOW, rect.inflate(6, 6), 2, border_radius=4)
+                if zone.exit_open:
+                    draw_text(surf, g.font_tiny, " EXIT ", (rect.right - 24, rect.top + 10), GREEN, center=True)
+            else:
+                surf.blit(zone.surface(s), rect)
+                if zone.exit_open:
+                    dx, dy = zone.exit_door
+                    pygame.draw.rect(surf, GREEN, (rect.x + dx * s, rect.y + dy * s, s, s))
+                pygame.draw.rect(surf, YELLOW if hover else GRAY, rect, 3 if hover else 1)
             label = f"{zid}. {zone.name}"
             if inv.has_key_for(zid):
                 label += "  [키 획득]"
@@ -110,25 +124,15 @@ class CenterScene(Scene):
             color = GOLD if inv.has_key_for(zid) else (PURPLE if g.is_night else WHITE)
             draw_text(surf, g.font_small, label, (rect.x, rect.y - 22), color)
 
-        # 최종 스테이지 건물 (키 4개 전까지 잠김)
-        unlocked = g.all_keys_collected
-        hover = unlocked and self.final_rect.collidepoint(mouse)
-        pygame.draw.rect(surf, BOSS_COLOR if unlocked else (45, 45, 55), self.final_rect, border_radius=6)
-        pygame.draw.rect(surf, YELLOW if hover else GRAY, self.final_rect, 3 if hover else 1, border_radius=6)
-        draw_text(surf, g.font_small, FINAL_ZONE_NAME, (self.final_rect.centerx, self.final_rect.centery - 12),
-                  WHITE, center=True)
-        status = "입장 가능" if unlocked else f"잠김 ({inv.key_count}/{ZONE_COUNT})"
-        draw_text(surf, g.font_tiny, status, (self.final_rect.centerx, self.final_rect.centery + 12),
-                  GOLD if unlocked else GRAY, center=True)
-
         pygame.draw.circle(surf, HOME_COLOR, self.home_pos, 58)
         pygame.draw.circle(surf, WHITE, self.home_pos, 58, 2)
         draw_text(surf, g.font_small, CENTER_NAME, (self.home_pos[0], self.home_pos[1] - 12), WHITE, center=True)
         draw_text(surf, g.font_small, "안전지대 · 회복", (self.home_pos[0], self.home_pos[1] + 14),
                   WHITE, center=True)
 
-        if unlocked:
-            goal = f"{FINAL_ZONE_NAME}을 클릭해 최종 보스에게 도전하자"
+        exit_zone = next((z for z in g.world.zones.values() if z.exit_open), None)
+        if exit_zone:
+            goal = f"{exit_zone.name}의 EXIT로 {FINAL_ZONE_NAME}에 가자"
         elif g.is_night:
             goal = "아무 건물에서나 괴물을 쓰러뜨려 키를 얻자"
         else:

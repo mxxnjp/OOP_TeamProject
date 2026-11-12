@@ -7,7 +7,7 @@ os.environ.setdefault("SDL_RENDER_SCALE_QUALITY", "linear")
 import pygame
 
 from settings import (SCREEN_W, SCREEN_H, FPS, TITLE, FONT_NAMES, PLAYER_LIVES, ZONE_COUNT,
-                      DAY_DURATION, CENTER_NAME, FINAL_ZONE_NAME, BOSS_NAME, KEY_ORDINALS,
+                      DAY_DURATIONS, CENTER_NAME, FINAL_ZONE_NAME, BOSS_NAME, KEY_ORDINALS,
                       PURPLE, RED, YELLOW)
 from world import World
 from entities import Player, Boss
@@ -39,13 +39,13 @@ class Game:
         self.player = Player()
         self.day = 1
         self.is_night = False
-        self.day_timer = DAY_DURATION
+        self.day_timer = self.day_duration()
         self.message = ""
         self.message_timer = 0.0
         self.world.start_day()
         self.scene = TransitionScene(
             self, [TITLE, f"{CENTER_NAME}에서 눈을 떴다...",
-                   f"낮({DAY_DURATION}초) 동안 건물을 돌며 무기를 모으자"],
+                   f"낮({self.day_timer}초) 동안 건물을 돌며 무기를 모으자"],
             on_finish=self.return_to_center)
 
     def change_scene(self, scene):
@@ -83,6 +83,10 @@ class Game:
             on_finish=go, color=PURPLE))
 
     # ---------------- 낮 / 밤 ----------------
+    def day_duration(self):
+        """오늘 낮의 제한 시간. 날이 갈수록 짧아지고, 표의 마지막 값에서 멈춘다."""
+        return DAY_DURATIONS[min(self.day, len(DAY_DURATIONS)) - 1]
+
     def update_clock(self, dt):
         if not self.is_night:
             self.day_timer -= dt
@@ -107,7 +111,7 @@ class Game:
     def start_day(self, message=None):
         self.is_night = False
         self.day += 1
-        self.day_timer = DAY_DURATION
+        self.day_timer = self.day_duration()
         self.world.start_day()
         self.notify(message or "아침이 밝았다. 괴물이 사라졌다.", 3.5)
 
@@ -135,7 +139,7 @@ class Game:
         self.return_to_center()
         if zone is not None and zone.is_final:
             # 보스전 실패: 키는 유지한 채 중앙으로, 다시 낮부터 무기 파밍
-            self.start_day(f"{BOSS_NAME}에게 졌다... 다시 무기를 모으자. (남은 목숨 {self.player.lives})")
+            self.start_day(f"{BOSS_NAME}에게 졌다... 무기를 모아 EXIT로 다시 도전하자. (남은 목숨 {self.player.lives})")
         else:
             self.notify(f"쓰러졌다! {CENTER_NAME}에서 다시 깨어났다. (남은 목숨 {self.player.lives})", 3.5)
 

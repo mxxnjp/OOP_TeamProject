@@ -11,8 +11,10 @@ from settings import (TILE, HUD_HEIGHT, PLAYER_MAX_HP, PLAYER_LIVES, PLAYER_MOVE
                       BOSS_MELEE_COOLDOWN, BOSS_RANGED_DAMAGE, BOSS_RANGED_COOLDOWN,
                       BOSS_RANGED_RANGE,
                       BLUE, WHITE, RED, GREEN, MONSTER_COLOR, BOSS_COLOR, DARK_RED)
+from settings import MONSTER_SPRITE_SIZE
 from items import Inventory
 from projectiles import PoisonDart
+from themes import load_sprite
 
 DIRECTIONS = ((1, 0), (-1, 0), (0, 1), (0, -1))
 
@@ -49,10 +51,11 @@ class Entity:
         wx, wy = self.world_center()
         return wx, wy + HUD_HEIGHT
 
-    def draw_hp_bar(self, surf):
+    def draw_hp_bar(self, surf, top=None):
+        """체력바. top: 캐릭터 그림 맨 윗줄 y (없으면 타일 위)."""
         cx, cy = self.screen_center()
         w = TILE - 4
-        x, y = cx - w / 2, cy - TILE / 2 - 6
+        x, y = cx - w / 2, (cy - TILE / 2 if top is None else top) - 6
         pygame.draw.rect(surf, DARK_RED, (x, y, w, 4))
         pygame.draw.rect(surf, GREEN, (x, y, w * self.hp / self.max_hp, 4))
 
@@ -127,10 +130,11 @@ class Monster(Entity):
     color = MONSTER_COLOR
     size = TILE - 6
 
-    def __init__(self, x, y, rng, name="괴물"):
+    def __init__(self, x, y, rng, name="괴물", sprite=None):
         super().__init__(x, y, self.max_hp)
         self.rng = rng
         self.name = name
+        self.sprite = sprite   # 그림 파일 경로 (assets/ 기준). None이면 사각형
         self.move_timer = rng.uniform(0, self.move_delay)
         self.melee_timer = 0.0
         self.ranged_timer = self.ranged_cooldown
@@ -198,16 +202,24 @@ class Monster(Entity):
 
     def draw(self, surf, font=None):
         cx, cy = self.screen_center()
-        color = WHITE if self.hurt_timer > 0 else self.color
-        rect = pygame.Rect(0, 0, self.size, self.size)
-        rect.center = (cx, cy)
-        pygame.draw.rect(surf, color, rect, border_radius=6)
-        pygame.draw.circle(surf, RED, (cx - 5, cy - 3), 3)
-        pygame.draw.circle(surf, RED, (cx + 5, cy - 3), 3)
-        self.draw_hp_bar(surf)
+        top = cy - TILE / 2
+        image = load_sprite(self.sprite, MONSTER_SPRITE_SIZE, flash=self.hurt_timer > 0) if self.sprite else None
+        if image:
+            # 발이 타일 바닥에 닿게 (키 큰 그림은 위로 삐져나옴)
+            rect = image.get_rect(midbottom=(cx, cy + TILE / 2))
+            surf.blit(image, rect)
+            top = min(top, rect.top)
+        else:
+            color = WHITE if self.hurt_timer > 0 else self.color
+            rect = pygame.Rect(0, 0, self.size, self.size)
+            rect.center = (cx, cy)
+            pygame.draw.rect(surf, color, rect, border_radius=6)
+            pygame.draw.circle(surf, RED, (cx - 5, cy - 3), 3)
+            pygame.draw.circle(surf, RED, (cx + 5, cy - 3), 3)
+        self.draw_hp_bar(surf, top)
         if font:   # 머리 위 이름표
             img = font.render(self.name, True, WHITE)
-            surf.blit(img, img.get_rect(midbottom=(cx, cy - TILE / 2 - 8)))
+            surf.blit(img, img.get_rect(midbottom=(cx, top - 7)))
 
 
 class Boss(Monster):

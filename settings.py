@@ -18,11 +18,20 @@ ZONE_LAYOUT = {1: (0, 0), 2: (1, 0), 3: (0, 1), 4: (1, 1)}
 FINAL_ZONE_ID = 5               # 최종 스테이지(구역 4개 키를 다 모으면 열림)
 # True면 밤마다 미로 재생성. 단, 재생성하면 바닥 무기가 사라져서 "무기 누적"이 안 됨
 MAZE_CHANGES_EACH_NIGHT = False
+# 직접 디자인한 맵 파일(assets/ 기준). 없는 건물은 랜덤 미로를 쓴다.
+#   맵 기호: # 벽   . 길   H 입구   E 탈출구   P 화분  T 책상  L 조명 (장식은 지나갈 수 없음)
+ZONE_MAP_FILES = {1: "maps/library.txt"}
+# 과방(중앙) 지도에서 미로 미리보기 대신 보여줄 건물 그림(assets/ 기준). 없는 건물은 미로 미리보기
+ZONE_BUILDING_IMAGES = {1: "buildings/library.png"}
 
 # ---------------- 테마(이름) : 여기만 바꾸면 게임 안 글자가 다 바뀜 ----------------
 CENTER_NAME = "과방 (교양관)"
 ZONE_NAMES = {1: "도서관", 2: "학생회관", 3: "명수당", 4: "기숙사"}
-MONSTER_NAMES = {1: "BOO", 2: "???", 3: "물귀신", 4: "경비아저씨"}
+MONSTER_NAMES = {1: "책괴물", 2: "BOO", 3: "물귀신", 4: "경비아저씨"}
+# 괴물 그림(assets/ 기준, 배경 투명 PNG). 없으면 사각형으로 그림
+MONSTER_SPRITES = {1: "monsters/book.png", 2: "monsters/boo.png",
+                   3: "monsters/ghost.png", 4: "monsters/guard.png"}
+MONSTER_SPRITE_SIZE = 44   # 괴물 그림이 들어갈 최대 크기(px). 타일(32)보다 조금 크게
 FINAL_ZONE_NAME = "교수연구동"
 BOSS_NAME = "교수님"
 KEY_ORDINALS = ("첫번째", "두번째", "세번째", "네번째")
@@ -71,7 +80,9 @@ MAX_PICKUPS_PER_ZONE = 12                        # 한 구역에 쌓일 수 있�
 FINAL_STAGE_POTIONS = 2                          # 최종 스테이지에 깔려 있는 물약 수
 
 # ---------------- 낮/밤 ----------------
-DAY_DURATION = 60          # 낮 제한 시간(초). 끝나면 그 자리에서 바로 밤
+# 낮 제한 시간(초): 1일차 60초, 2일차 40초, 3일차 20초, 4일차부터는 계속 마지막 값(10초)
+# 끝나면 그 자리에서 바로 밤
+DAY_DURATIONS = (60, 40, 20, 10)
                            # 밤은 시간 제한 없음: 괴물 한 마리를 쓰러뜨리면 다시 낮
 TRANSITION_TIME = 2.5      # 안내 화면 표시 시간(아무 키로 스킵)
 NIGHT_VISION_RADIUS = 4.5  # 밤 시야(타일 단위)

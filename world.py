@@ -1,16 +1,15 @@
 """맵 구조: Maze(미로 격자) -> Zone(건물 하나) / FinalZone(최종 스테이지) -> World(전체)."""
+import os
 import random
 from collections import deque
 
-import pygame
-
 from settings import (MAZE_COLS, MAZE_ROWS, TILE, ZONE_COUNT, ZONE_LAYOUT, FINAL_ZONE_ID,
-                      MAZE_CHANGES_EACH_NIGHT, MONSTER_SPAWN_AWAY_FROM_PLAYER,
-                      ZONE_NAMES, MONSTER_NAMES, FINAL_ZONE_NAME, BOSS_NAME,
-                      DAY_LOOT, MAX_PICKUPS_PER_ZONE, FINAL_STAGE_POTIONS,
-                      WALL, WALL_EDGE, FLOOR)
+                      MAZE_CHANGES_EACH_NIGHT, MONSTER_SPAWN_AWAY_FROM_PLAYER, ZONE_MAP_FILES,
+                      ZONE_NAMES, MONSTER_NAMES, MONSTER_SPRITES, FINAL_ZONE_NAME, BOSS_NAME,
+                      DAY_LOOT, MAX_PICKUPS_PER_ZONE, FINAL_STAGE_POTIONS)
 from items import WeaponPickup, PotionPickup, Spear, Bow
 from entities import Monster, Boss, DIRECTIONS
+from themes import ASSET_DIR, DECOR_SYMBOLS, DEFAULT_THEME, ZONE_THEMES
 
 LOOT_FACTORIES = {
     "spear": lambda x, y: WeaponPickup(x, y, Spear),
@@ -20,13 +19,42 @@ LOOT_FACTORIES = {
 
 
 class Maze:
-    """0 = 길, 1 = 벽. 재귀 백트래킹으로 생성 후 고리(loop)를 조금 뚫어 전투 공간 확보."""
+    """0 = 길, 1 = 벽. 랜덤 생성(generate) 또는 맵 파일(from_file)로 만든다."""
 
-    def __init__(self, cols, rows, rng):
-        self.cols, self.rows = cols, rows
-        self.grid = [[1] * cols for _ in range(rows)]
-        self._carve(rng)
-        self._add_loops(rng, ratio=0.08)
+    def __init__(self, grid):
+        self.grid = grid
+        self.rows, self.cols = len(grid), len(grid[0])
+
+    @classmethod
+    def generate(cls, cols, rows, rng):
+        """재귀 백트래킹으로 생성 후 고리(loop)를 조금 뚫어 전투 공간 확보."""
+        maze = cls([[1] * cols for _ in range(rows)])
+        maze._carve(rng)
+        maze._add_loops(rng, ratio=0.08)
+        return maze
+
+    @classmethod
+    def from_file(cls, path):
+        """텍스트 맵 파일 읽기. (미로, {'H': 입구, 'E': 탈출구}, {좌표: 장식이름}) 반환."""
+        with open(path, encoding="utf-8") as f:
+            lines = [line.rstrip("\n") for line in f if line.strip()]
+        grid, markers, decor = [], {}, {}
+        for y, line in enumerate(lines):
+            row = []
+            for x, ch in enumerate(line):
+                if ch in DECOR_SYMBOLS:
+                    decor[(x, y)] = DECOR_SYMBOLS[ch]
+                    row.append(1)
+                elif ch == "#":
+                    row.append(1)
+                else:
+                    row.append(0)
+                    if ch in "HE":
+                        markers[ch] = (x, y)
+            grid.append(row)
+        if len(grid) != MAZE_ROWS or any(len(r) != MAZE_COLS for r in grid):
+            raise ValueError(f"{path}: 맵은 가로 {MAZE_COLS} x 세로 {MAZE_ROWS} 칸이어야 합니다.")
+        return cls(grid), markers, decor
 
     def _carve(self, rng):
         self.grid[1][1] = 0
@@ -82,18 +110,6 @@ class Maze:
             return None, float("inf")
         return parents[start], dist[start]
 
-    def render(self, scale=TILE):
-        surf = pygame.Surface((self.cols * scale, self.rows * scale))
-        surf.fill(FLOOR)
-        for y, row in enumerate(self.grid):
-            for x, cell in enumerate(row):
-                if cell:
-                    r = pygame.Rect(x * scale, y * scale, scale, scale)
-                    pygame.draw.rect(surf, WALL, r)
-                    if scale >= 8:
-                        pygame.draw.rect(surf, WALL_EDGE, r, 1)
-        return surf
-
 
 class Zone:
     """건물(서브 미로) 하나. 미로, 입구(중앙 연결), 탈출구, 아이템, 괴물을 가진다.
@@ -117,11 +133,16 @@ class Zone:
 
     def build_maze(self, seed):
         self.rng = random.Random(seed)
-        self.maze = Maze(MAZE_COLS, MAZE_ROWS, self.rng)
-        self.entrance = self.pick_entrance()
+        self.theme = ZONE_THEMES.get(self.id, DEFAULT_THEME)
+        map_file = ZONE_MAP_FILES.get(self.id)
+        if map_file:      # 직접 디자인한 맵
+            self.maze, markers, self.decor = Maze.from_file(os.path.join(ASSET_DIR, map_file))
+        else:             # 랜덤 미로
+            self.maze, markers, self.decor = Maze.generate(MAZE_COLS, MAZE_ROWS, self.rng), {}, {}
+        self.entrance = markers.get("H") or self.pick_entrance()
         self.dist_from_entrance = self.maze.distances_from(self.entrance)
-        # 탈출구 자리는 입구에서 가장 먼 곳
-        self.exit_door = max(self.dist_from_entrance, key=self.dist_from_entrance.get)
+        # 탈출구 자리: 맵에 E가 있으면 거기, 없으면 입구에서 가장 먼 곳
+        self.exit_door = markers.get("E") or max(self.dist_from_entrance, key=self.dist_from_entrance.get)
         self.pickups.clear()
         self.monsters.clear()
         self.projectiles.clear()
@@ -129,7 +150,7 @@ class Zone:
 
     def surface(self, scale=TILE):
         if scale not in self._surface_cache:
-            self._surface_cache[scale] = self.maze.render(scale)
+            self._surface_cache[scale] = self.theme.render(self.maze, self.decor, scale)
         return self._surface_cache[scale]
 
     # ---------- 스폰 ----------
@@ -158,7 +179,7 @@ class Zone:
 
     def spawn_night_monster(self, avoid=None):
         tile = self._random_free_tile(min_dist=12, avoid=avoid, avoid_dist=MONSTER_SPAWN_AWAY_FROM_PLAYER)
-        self.monsters.append(Monster(*tile, self.rng, self.monster_name))
+        self.monsters.append(Monster(*tile, self.rng, self.monster_name, MONSTER_SPRITES.get(self.id)))
 
     def clear_monsters(self):
         self.monsters.clear()
