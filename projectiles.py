@@ -54,5 +54,5 @@ class Arrow(Projectile):
 
 
 class PoisonDart(Projectile):
-    def __init__(self, x, y, dx, dy):
-        super().__init__(x, y, dx, dy, DART_SPEED, MONSTER_RANGED_DAMAGE, False, PURPLE, 4)
+    def __init__(self, x, y, dx, dy, damage=MONSTER_RANGED_DAMAGE):
+        super().__init__(x, y, dx, dy, DART_SPEED, damage, False, PURPLE, 4)

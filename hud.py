@@ -1,7 +1,8 @@
 """상단 HUD(목숨, 체력, 인벤토리, 낮/밤, 전체 지도)와 공용 그리기 함수."""
 import pygame
 
-from settings import (SCREEN_W, HUD_HEIGHT, ZONE_LAYOUT, PLAYER_MAX_HP,
+from settings import (SCREEN_W, HUD_HEIGHT, ZONE_LAYOUT, PLAYER_MAX_HP, FINAL_ZONE_ID,
+                      ZONE_NAMES, BOSS_NAME,
                       HUD_BG, WHITE, GRAY, RED, DARK_RED, GREEN, GOLD, YELLOW,
                       HOME_COLOR, PURPLE)
 
@@ -53,13 +54,15 @@ def draw_hud(surf, game, current_zone_id=None):
         color = GREEN if i < p.hp else DARK_RED
         pygame.draw.rect(surf, color, (56 + i * 17, 41, 14, 14), border_radius=2)
 
-    # 낮 / 밤
-    if game.is_night:
-        mm, ss = divmod(int(max(0, game.night_timer)), 60)
-        phase = f"밤 {game.day}일차  ({mm:02d}:{ss:02d} 남음)"
-        draw_text(surf, f, phase, (12, 66), PURPLE)
+    # 낮 / 밤 / 최종 스테이지
+    if current_zone_id == FINAL_ZONE_ID:
+        draw_text(surf, f, f"최종 스테이지 - vs {BOSS_NAME}", (12, 66), PURPLE)
+    elif game.is_night:
+        draw_text(surf, f, f"밤 {game.day}일차  - 괴물을 쓰러뜨려라", (12, 66), PURPLE)
     else:
-        draw_text(surf, f, f"낮 {game.day}일차  - 무기를 모으자", (12, 66), YELLOW)
+        mm, ss = divmod(int(max(0, game.day_timer)), 60)
+        color = RED if game.day_timer <= 10 else YELLOW   # 10초 남으면 빨간색 경고
+        draw_text(surf, f, f"낮 {game.day}일차  밤까지 {mm:02d}:{ss:02d}", (12, 66), color)
 
     # 인벤토리 슬롯
     slots = [("1", inv.weapons.get("spear"), "창"), ("2", inv.weapons.get("bow"), "활")]
@@ -79,11 +82,14 @@ def draw_hud(surf, game, current_zone_id=None):
     draw_text(surf, f, "3", (r.x + 5, r.y + 2), GRAY)
     draw_text(surf, f, f"물약 x{inv.potions}", r.center, RED if inv.potions else GRAY, center=True)
 
-    # 열쇠
-    if inv.key:
-        draw_text(surf, f, f"열쇠: {inv.key.zone_id}구역 탈출구", (260, 62), GOLD)
-    else:
-        draw_text(surf, f, "열쇠: 없음 (괴물을 처치해서 얻기)", (260, 62), GRAY)
+    # 키 4칸 (건물별)
+    draw_text(surf, f, "키", (260, 64))
+    for i, (zid, name) in enumerate(ZONE_NAMES.items()):
+        r = pygame.Rect(282 + i * 88, 60, 84, 26)
+        got = inv.has_key_for(zid)
+        pygame.draw.rect(surf, (70, 58, 20) if got else (40, 40, 48), r, border_radius=4)
+        pygame.draw.rect(surf, GOLD if got else GRAY, r, 1, border_radius=4)
+        draw_text(surf, game.font_tiny, name, r.center, GOLD if got else GRAY, center=True)
 
     # 전체 지도
     draw_minimap(surf, pygame.Rect(SCREEN_W - 120, 8, 108, 80), current_zone_id, game.is_night)

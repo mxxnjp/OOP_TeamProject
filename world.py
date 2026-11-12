@@ -1,14 +1,22 @@
-"""맵 구조: Maze(미로 격자) -> Zone(구역 하나) -> World(구역 4개 묶음)."""
+"""맵 구조: Maze(미로 격자) -> Zone(건물 하나) / FinalZone(최종 스테이지) -> World(전체)."""
 import random
 from collections import deque
 
 import pygame
 
-from settings import (MAZE_COLS, MAZE_ROWS, TILE, ZONE_COUNT, ZONE_LAYOUT,
-                      MAZE_CHANGES_EACH_NIGHT, MONSTERS_PER_ZONE,
+from settings import (MAZE_COLS, MAZE_ROWS, TILE, ZONE_COUNT, ZONE_LAYOUT, FINAL_ZONE_ID,
+                      MAZE_CHANGES_EACH_NIGHT, MONSTER_SPAWN_AWAY_FROM_PLAYER,
+                      ZONE_NAMES, MONSTER_NAMES, FINAL_ZONE_NAME, BOSS_NAME,
+                      DAY_LOOT, MAX_PICKUPS_PER_ZONE, FINAL_STAGE_POTIONS,
                       WALL, WALL_EDGE, FLOOR)
-from items import WeaponPickup, PotionPickup, KeyPickup, Spear, Bow, Key
-from entities import Monster, DIRECTIONS
+from items import WeaponPickup, PotionPickup, Spear, Bow
+from entities import Monster, Boss, DIRECTIONS
+
+LOOT_FACTORIES = {
+    "spear": lambda x, y: WeaponPickup(x, y, Spear),
+    "bow": lambda x, y: WeaponPickup(x, y, Bow),
+    "potion": PotionPickup,
+}
 
 
 class Maze:
@@ -88,24 +96,31 @@ class Maze:
 
 
 class Zone:
-    """구역(서브 미로) 하나. 미로, 입구(중앙 연결), 탈출구, 아이템, 괴물을 가진다."""
+    """건물(서브 미로) 하나. 미로, 입구(중앙 연결), 탈출구, 아이템, 괴물을 가진다.
+    탈출구는 처음엔 숨겨져 있고, 마지막(4번째) 키를 이 구역에서 얻으면 나타난다."""
+    is_final = False
 
     def __init__(self, zone_id, seed):
         self.id = zone_id
-        self.layout_pos = ZONE_LAYOUT[zone_id]
+        self.name = ZONE_NAMES.get(zone_id, f"{zone_id}구역")
+        self.monster_name = MONSTER_NAMES.get(zone_id, "괴물")
         self.pickups = []
         self.monsters = []
         self.projectiles = []
+        self.exit_open = False
         self.build_maze(seed)
+
+    def pick_entrance(self):
+        """입구는 중앙(과방)을 향한 모서리."""
+        lx, ly = ZONE_LAYOUT[self.id]
+        return (MAZE_COLS - 2 if lx == 0 else 1, MAZE_ROWS - 2 if ly == 0 else 1)
 
     def build_maze(self, seed):
         self.rng = random.Random(seed)
         self.maze = Maze(MAZE_COLS, MAZE_ROWS, self.rng)
-        lx, ly = self.layout_pos
-        # 입구는 중앙(집)을 향한 모서리에 위치
-        self.entrance = (MAZE_COLS - 2 if lx == 0 else 1, MAZE_ROWS - 2 if ly == 0 else 1)
+        self.entrance = self.pick_entrance()
         self.dist_from_entrance = self.maze.distances_from(self.entrance)
-        # 탈출구는 입구에서 가장 먼 곳
+        # 탈출구 자리는 입구에서 가장 먼 곳
         self.exit_door = max(self.dist_from_entrance, key=self.dist_from_entrance.get)
         self.pickups.clear()
         self.monsters.clear()
@@ -118,25 +133,32 @@ class Zone:
         return self._surface_cache[scale]
 
     # ---------- 스폰 ----------
-    def _random_free_tile(self, min_dist):
+    def _random_free_tile(self, min_dist, avoid=None, avoid_dist=0):
         occupied = ({(p.x, p.y) for p in self.pickups} | {(m.x, m.y) for m in self.monsters}
                     | {self.entrance, self.exit_door})
-        tiles = [t for t, d in self.dist_from_entrance.items() if d >= min_dist and t not in occupied]
+
+        def ok(tile, need_dist):
+            if tile in occupied or self.dist_from_entrance[tile] < need_dist:
+                return False
+            return avoid is None or abs(tile[0] - avoid[0]) + abs(tile[1] - avoid[1]) >= avoid_dist
+
+        tiles = [t for t in self.dist_from_entrance if ok(t, min_dist)]
         if not tiles:
-            tiles = [t for t in self.dist_from_entrance if t not in occupied]
+            tiles = [t for t in self.dist_from_entrance if ok(t, 0)] or \
+                    [t for t in self.dist_from_entrance if t not in occupied]
         return self.rng.choice(tiles)
 
     def spawn_day_items(self):
-        self.pickups = [p for p in self.pickups if isinstance(p, KeyPickup)]
-        for make in (lambda x, y: WeaponPickup(x, y, Spear),
-                     lambda x, y: WeaponPickup(x, y, Bow),
-                     PotionPickup):
-            self.pickups.append(make(*self._random_free_tile(min_dist=6)))
+        """낮마다 아이템을 '추가'한다(안 주운 것은 그대로 남아 누적). 최대 개수 제한 있음."""
+        for kind, count in DAY_LOOT.items():
+            for _ in range(count):
+                if len(self.pickups) >= MAX_PICKUPS_PER_ZONE:
+                    return
+                self.pickups.append(LOOT_FACTORIES[kind](*self._random_free_tile(min_dist=6)))
 
-    def spawn_night(self, monster_count):
-        self.pickups.append(PotionPickup(*self._random_free_tile(min_dist=4)))
-        for _ in range(monster_count):
-            self.monsters.append(Monster(*self._random_free_tile(min_dist=12), self.rng))
+    def spawn_night_monster(self, avoid=None):
+        tile = self._random_free_tile(min_dist=12, avoid=avoid, avoid_dist=MONSTER_SPAWN_AWAY_FROM_PLAYER)
+        self.monsters.append(Monster(*tile, self.rng, self.monster_name))
 
     def clear_monsters(self):
         self.monsters.clear()
@@ -157,10 +179,10 @@ class Zone:
             p.update(dt, self, player)
         self.projectiles = [p for p in self.projectiles if p.alive]
 
-        for m in [m for m in self.monsters if not m.alive]:
-            self.pickups.append(KeyPickup(m.x, m.y, Key.random(self.rng)))
-            game.notify("괴물을 쓰러뜨렸다! 열쇠가 떨어졌다.")
+        dead = [m for m in self.monsters if not m.alive]
         self.monsters = [m for m in self.monsters if m.alive]
+        for m in dead:
+            game.on_monster_killed(self, m)
 
     def collect_pickups(self, player, game):
         for p in list(self.pickups):
@@ -171,26 +193,61 @@ class Zone:
                     game.notify(msg)
 
 
+class FinalZone(Zone):
+    """최종 스테이지(교수연구동). 보스가 최종 탈출구 바로 앞을 막고 있다.
+    보스를 쓰러뜨리면 탈출구가 열린다. 입장할 때마다 보스전이 처음부터 시작."""
+    is_final = True
+
+    def __init__(self, seed):
+        super().__init__(FINAL_ZONE_ID, seed)
+        self.name = FINAL_ZONE_NAME
+        self.monster_name = BOSS_NAME
+
+    def pick_entrance(self):
+        return (1, MAZE_ROWS - 2)
+
+    def build_maze(self, seed):
+        super().build_maze(seed)
+        # 보스 자리: 탈출구에서 입구 방향으로 한 칸 앞 (= 탈출구를 막는 위치)
+        self.boss_home = self.maze.next_step(self.exit_door, self.entrance)[0]
+
+    def reset_encounter(self):
+        self.clear_monsters()
+        self.projectiles.clear()
+        self.exit_open = False
+        self.monsters.append(Boss(*self.boss_home, self.rng, BOSS_NAME))
+        while sum(isinstance(p, PotionPickup) for p in self.pickups) < FINAL_STAGE_POTIONS:
+            self.pickups.append(PotionPickup(*self._random_free_tile(min_dist=4)))
+
+
 class World:
-    """구역 4개를 관리. 낮/밤 전환 시 스폰과 미로 재생성을 담당."""
+    """건물 4개 + 최종 스테이지를 관리. 낮/밤 전환 시 스폰을 담당."""
 
     def __init__(self, seed=None):
         self.seed = seed if seed is not None else random.randrange(1 << 30)
         self.generation = 0
         self.zones = {i: Zone(i, self._zone_seed(i)) for i in range(1, ZONE_COUNT + 1)}
+        self.final = FinalZone(self._zone_seed(FINAL_ZONE_ID))
 
     def _zone_seed(self, zone_id):
         return self.seed * 1000 + self.generation * 10 + zone_id
 
-    def start_day(self):
+    def clear_monsters(self):
         for z in self.zones.values():
             z.clear_monsters()
+
+    def start_day(self):
+        self.clear_monsters()
+        for z in self.zones.values():
             z.spawn_day_items()
 
-    def start_night(self):
+    def start_night(self, cleared_zone_ids, player_zone=None, player_pos=None):
+        """아직 키를 얻지 못한 건물에만 괴물 1마리씩 등장.
+        플레이어가 구역 안에 있으면 그 근처에는 나오지 않게 한다."""
         if MAZE_CHANGES_EACH_NIGHT:
             self.generation += 1
             for z in self.zones.values():
                 z.build_maze(self._zone_seed(z.id))
         for z in self.zones.values():
-            z.spawn_night(MONSTERS_PER_ZONE)
+            if z.id not in cleared_zone_ids:
+                z.spawn_night_monster(avoid=player_pos if z is player_zone else None)

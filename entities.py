@@ -1,4 +1,4 @@
-"""캐릭터: Entity(공통) -> Player(플레이어), Monster(괴물)."""
+"""캐릭터: Entity(공통) -> Player(플레이어), Monster(괴물) -> Boss(최종 보스)."""
 import math
 
 import pygame
@@ -6,8 +6,11 @@ import pygame
 from settings import (TILE, HUD_HEIGHT, PLAYER_MAX_HP, PLAYER_LIVES, PLAYER_MOVE_DELAY,
                       POTION_HEAL_RATIO, MONSTER_MAX_HP, MONSTER_MOVE_DELAY,
                       MONSTER_DETECT_RANGE, MONSTER_MELEE_DAMAGE, MONSTER_MELEE_COOLDOWN,
-                      MONSTER_RANGED_COOLDOWN, MONSTER_RANGED_RANGE,
-                      BLUE, WHITE, RED, GREEN, MONSTER_COLOR, DARK_RED)
+                      MONSTER_RANGED_DAMAGE, MONSTER_RANGED_COOLDOWN, MONSTER_RANGED_RANGE,
+                      BOSS_MAX_HP, BOSS_MOVE_DELAY, BOSS_DETECT_RANGE, BOSS_MELEE_DAMAGE,
+                      BOSS_MELEE_COOLDOWN, BOSS_RANGED_DAMAGE, BOSS_RANGED_COOLDOWN,
+                      BOSS_RANGED_RANGE,
+                      BLUE, WHITE, RED, GREEN, MONSTER_COLOR, BOSS_COLOR, DARK_RED)
 from items import Inventory
 from projectiles import PoisonDart
 
@@ -111,14 +114,26 @@ class Player(Entity):
 
 
 class Monster(Entity):
-    """밤에 등장하는 괴물. 근접 공격 + 직선 시야에서 독침 발사."""
+    """밤에 등장하는 괴물. 근접 공격 + 직선 시야에서 독침 발사.
+    능력치는 클래스 속성이라, 자식 클래스(Boss)는 숫자만 덮어쓰면 된다."""
+    max_hp = MONSTER_MAX_HP
+    move_delay = MONSTER_MOVE_DELAY
+    detect_range = MONSTER_DETECT_RANGE
+    melee_damage = MONSTER_MELEE_DAMAGE
+    melee_cooldown = MONSTER_MELEE_COOLDOWN
+    ranged_damage = MONSTER_RANGED_DAMAGE
+    ranged_cooldown = MONSTER_RANGED_COOLDOWN
+    ranged_range = MONSTER_RANGED_RANGE
+    color = MONSTER_COLOR
+    size = TILE - 6
 
-    def __init__(self, x, y, rng):
-        super().__init__(x, y, MONSTER_MAX_HP)
+    def __init__(self, x, y, rng, name="괴물"):
+        super().__init__(x, y, self.max_hp)
         self.rng = rng
-        self.move_timer = rng.uniform(0, MONSTER_MOVE_DELAY)
+        self.name = name
+        self.move_timer = rng.uniform(0, self.move_delay)
         self.melee_timer = 0.0
-        self.ranged_timer = MONSTER_RANGED_COOLDOWN
+        self.ranged_timer = self.ranged_cooldown
 
     def update(self, dt, zone, player):
         self.update_timers(dt)
@@ -131,27 +146,35 @@ class Monster(Entity):
         # 1) 바로 옆이면 근접 공격 (쿨타임 있음)
         if distance == 1:
             if self.melee_timer <= 0:
-                player.take_damage(MONSTER_MELEE_DAMAGE)
-                self.melee_timer = MONSTER_MELEE_COOLDOWN
+                player.take_damage(self.melee_damage)
+                self.melee_timer = self.melee_cooldown
             return
 
         # 2) 직선 시야에 들어오면 독침
         if self.ranged_timer <= 0 and self._has_line_of_sight(player, zone):
             mx, my = self.world_center()
             px, py = player.world_center()
-            zone.projectiles.append(PoisonDart(mx, my, px - mx, py - my))
-            self.ranged_timer = MONSTER_RANGED_COOLDOWN
+            zone.projectiles.append(PoisonDart(mx, my, px - mx, py - my, self.ranged_damage))
+            self.ranged_timer = self.ranged_cooldown
 
-        # 3) 이동: 가까우면 추적, 아니면 배회
+        # 3) 이동
         if self.move_timer <= 0:
-            self.move_timer = MONSTER_MOVE_DELAY
-            step, path_len = zone.maze.next_step((self.x, self.y), (player.x, player.y))
-            if step is None or path_len > MONSTER_DETECT_RANGE:
-                options = [(self.x + dx, self.y + dy) for dx, dy in DIRECTIONS
-                           if not zone.maze.is_wall(self.x + dx, self.y + dy)]
-                step = self.rng.choice(options) if options else None
+            self.move_timer = self.move_delay
+            step = self.choose_step(zone, player)
             if step and step != (player.x, player.y) and not zone.monster_at(*step):
                 self.x, self.y = step
+
+    def choose_step(self, zone, player):
+        """다음에 갈 칸. 가까우면 추적, 멀면 배회. (Boss가 오버라이드)"""
+        step, path_len = zone.maze.next_step((self.x, self.y), (player.x, player.y))
+        if step is not None and path_len <= self.detect_range:
+            return step
+        return self.wander_step(zone)
+
+    def wander_step(self, zone):
+        options = [(self.x + dx, self.y + dy) for dx, dy in DIRECTIONS
+                   if not zone.maze.is_wall(self.x + dx, self.y + dy)]
+        return self.rng.choice(options) if options else None
 
     def _has_line_of_sight(self, player, zone):
         if self.x == player.x:
@@ -162,7 +185,7 @@ class Monster(Entity):
             cells = [(x, self.y) for x in range(lo + 1, hi)]
         else:
             return False
-        if len(cells) + 1 > MONSTER_RANGED_RANGE:
+        if len(cells) + 1 > self.ranged_range:
             return False
         return not any(zone.maze.is_wall(cx, cy) for cx, cy in cells)
 
@@ -171,14 +194,43 @@ class Monster(Entity):
         if zone.maze.is_wall(nx, ny) or zone.monster_at(nx, ny) or (nx, ny) == (player.x, player.y):
             return
         self.x, self.y = nx, ny
-        self.move_timer = MONSTER_MOVE_DELAY  # 밀려나면 잠깐 경직
+        self.move_timer = self.move_delay  # 밀려나면 잠깐 경직
 
-    def draw(self, surf):
+    def draw(self, surf, font=None):
         cx, cy = self.screen_center()
-        color = WHITE if self.hurt_timer > 0 else MONSTER_COLOR
-        rect = pygame.Rect(0, 0, TILE - 6, TILE - 6)
+        color = WHITE if self.hurt_timer > 0 else self.color
+        rect = pygame.Rect(0, 0, self.size, self.size)
         rect.center = (cx, cy)
         pygame.draw.rect(surf, color, rect, border_radius=6)
         pygame.draw.circle(surf, RED, (cx - 5, cy - 3), 3)
         pygame.draw.circle(surf, RED, (cx + 5, cy - 3), 3)
         self.draw_hp_bar(surf)
+        if font:   # 머리 위 이름표
+            img = font.render(self.name, True, WHITE)
+            surf.blit(img, img.get_rect(midbottom=(cx, cy - TILE / 2 - 8)))
+
+
+class Boss(Monster):
+    """최종 보스. 더 강하고, 최종 탈출구 앞(home)을 지킨다."""
+    max_hp = BOSS_MAX_HP
+    move_delay = BOSS_MOVE_DELAY
+    detect_range = BOSS_DETECT_RANGE
+    melee_damage = BOSS_MELEE_DAMAGE
+    melee_cooldown = BOSS_MELEE_COOLDOWN
+    ranged_damage = BOSS_RANGED_DAMAGE
+    ranged_cooldown = BOSS_RANGED_COOLDOWN
+    ranged_range = BOSS_RANGED_RANGE
+    color = BOSS_COLOR
+    size = TILE - 2
+
+    def __init__(self, x, y, rng, name):
+        super().__init__(x, y, rng, name)
+        self.home = (x, y)
+
+    def choose_step(self, zone, player):
+        step, path_len = zone.maze.next_step((self.x, self.y), (player.x, player.y))
+        if step is not None and path_len <= self.detect_range:
+            return step                       # 가까우면 추적
+        if (self.x, self.y) != self.home:     # 멀면 탈출구 앞으로 복귀
+            return zone.maze.next_step((self.x, self.y), self.home)[0]
+        return None

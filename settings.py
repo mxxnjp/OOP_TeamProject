@@ -8,14 +8,24 @@ HUD_HEIGHT = 96                # 상단 HUD(체력/인벤토리/전체지도) �
 SCREEN_W = TILE * MAZE_COLS                # 800
 SCREEN_H = HUD_HEIGHT + TILE * MAZE_ROWS   # 640
 FPS = 60
-TITLE = "Maze Escape - OOP Project"
+TITLE = "HUFS RUN: 졸업 좀 시켜주세요"
 FONT_NAMES = "malgungothic,applegothic,nanumgothic"  # 한글 폰트 후보
 
 # ---------------- 구역 ----------------
 ZONE_COUNT = 4
 # 구역 번호 -> 전체 지도에서의 위치 (열, 행). 중앙(집)은 네 구역 사이에 있음
 ZONE_LAYOUT = {1: (0, 0), 2: (1, 0), 3: (0, 1), 4: (1, 1)}
-MAZE_CHANGES_EACH_NIGHT = True  # True: 밤마다 미로 재생성 / False: 고정 미로
+FINAL_ZONE_ID = 5               # 최종 스테이지(구역 4개 키를 다 모으면 열림)
+# True면 밤마다 미로 재생성. 단, 재생성하면 바닥 무기가 사라져서 "무기 누적"이 안 됨
+MAZE_CHANGES_EACH_NIGHT = False
+
+# ---------------- 테마(이름) : 여기만 바꾸면 게임 안 글자가 다 바뀜 ----------------
+CENTER_NAME = "과방 (교양관)"
+ZONE_NAMES = {1: "도서관", 2: "학생회관", 3: "명수당", 4: "기숙사"}
+MONSTER_NAMES = {1: "BOO", 2: "???", 3: "물귀신", 4: "경비아저씨"}
+FINAL_ZONE_NAME = "교수연구동"
+BOSS_NAME = "교수님"
+KEY_ORDINALS = ("첫번째", "두번째", "세번째", "네번째")
 
 # ---------------- 플레이어 ----------------
 PLAYER_MAX_HP = 10
@@ -43,10 +53,26 @@ MONSTER_RANGED_DAMAGE = 2
 MONSTER_RANGED_COOLDOWN = 3.0
 MONSTER_RANGED_RANGE = 7           # 직선 시야 몇 칸 안이면 독침 발사
 DART_SPEED = 260
-MONSTERS_PER_ZONE = 1
+MONSTER_SPAWN_AWAY_FROM_PLAYER = 8  # 밤이 될 때 플레이어와 최소 몇 칸 떨어져 등장
+
+# ---------------- 최종 보스 (일반 괴물보다 강하게) ----------------
+BOSS_MAX_HP = 40
+BOSS_MOVE_DELAY = 0.3
+BOSS_DETECT_RANGE = 9              # 이보다 멀어지면 탈출구 앞으로 돌아가 지킴
+BOSS_MELEE_DAMAGE = 4
+BOSS_MELEE_COOLDOWN = 1.2
+BOSS_RANGED_DAMAGE = 2
+BOSS_RANGED_COOLDOWN = 1.6
+BOSS_RANGED_RANGE = 9
+
+# ---------------- 아이템 스폰 (무기 누적) ----------------
+DAY_LOOT = {"spear": 1, "bow": 1, "potion": 1}   # 낮이 될 때마다 구역별로 "추가"되는 양
+MAX_PICKUPS_PER_ZONE = 12                        # 한 구역에 쌓일 수 있는 최대 아이템 수
+FINAL_STAGE_POTIONS = 2                          # 최종 스테이지에 깔려 있는 물약 수
 
 # ---------------- 낮/밤 ----------------
-NIGHT_DURATION = 150       # 밤 지속 시간(초). 끝나면 다시 낮
+DAY_DURATION = 60          # 낮 제한 시간(초). 끝나면 그 자리에서 바로 밤
+                           # 밤은 시간 제한 없음: 괴물 한 마리를 쓰러뜨리면 다시 낮
 TRANSITION_TIME = 2.5      # 안내 화면 표시 시간(아무 키로 스킵)
 NIGHT_VISION_RADIUS = 4.5  # 밤 시야(타일 단위)
 
@@ -67,5 +93,6 @@ GOLD = (240, 190, 50)
 BLUE = (70, 130, 230)
 PURPLE = (160, 70, 210)
 MONSTER_COLOR = (120, 40, 40)
+BOSS_COLOR = (90, 30, 110)
 HOME_COLOR = (90, 150, 200)
 DOOR_COLOR = (90, 90, 100)

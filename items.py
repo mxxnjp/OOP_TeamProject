@@ -1,14 +1,13 @@
 """무기, 열쇠, 인벤토리, 그리고 바닥에 떨어진 아이템(Pickup)."""
 import math
-import random
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 import pygame
 
-from settings import (TILE, HUD_HEIGHT, ZONE_COUNT, SPEAR_DAMAGE, SPEAR_COOLDOWN,
+from settings import (TILE, HUD_HEIGHT, SPEAR_DAMAGE, SPEAR_COOLDOWN,
                       SPEAR_KNOCKBACK, BOW_DAMAGE, BOW_COOLDOWN, BOW_START_ARROWS,
-                      WHITE, RED, GOLD, YELLOW)
+                      WHITE, RED, YELLOW)
 from projectiles import Arrow
 
 
@@ -126,13 +125,9 @@ class Bow(Weapon):
 # =====================================================================
 # 열쇠
 # =====================================================================
-@dataclass
+@dataclass(frozen=True)
 class Key:
-    zone_id: int   # 이 열쇠로 열 수 있는 탈출구가 있는 구역
-
-    @classmethod
-    def random(cls, rng=random):
-        return cls(rng.randint(1, ZONE_COUNT))
+    zone_id: int   # 이 키를 얻은 구역 (구역마다 1개, 총 4개)
 
 
 # =====================================================================
@@ -145,11 +140,22 @@ class Inventory:
         self.weapons = {}
         self.current = None
         self.potions = 0
-        self.key = None
+        self.keys = set()   # 얻은 Key들 (구역마다 하나)
 
     @property
     def current_weapon(self):
         return self.weapons.get(self.current)
+
+    def add_key(self, key):
+        self.keys.add(key)
+        return len(self.keys)
+
+    def has_key_for(self, zone_id):
+        return Key(zone_id) in self.keys
+
+    @property
+    def key_count(self):
+        return len(self.keys)
 
     def add_weapon(self, weapon):
         existing = self.weapons.get(weapon.name)
@@ -170,13 +176,6 @@ class Inventory:
         if 0 <= index < len(self.SLOT_ORDER):
             return self.select(self.SLOT_ORDER[index])
         return None
-
-    def cycle(self):
-        owned = [n for n in self.SLOT_ORDER if n in self.weapons]
-        if not owned:
-            return None
-        i = owned.index(self.current) if self.current in owned else -1
-        return self.select(owned[(i + 1) % len(owned)])
 
     def update(self, dt):
         for w in self.weapons.values():
@@ -235,23 +234,3 @@ class PotionPickup(Pickup):
         r = self.rect()
         pygame.draw.circle(surf, self.color, r.center, r.width // 2)
         pygame.draw.rect(surf, WHITE, (r.centerx - 3, r.top - 4, 6, 6))
-
-
-class KeyPickup(Pickup):
-    color = GOLD
-
-    def __init__(self, x, y, key):
-        super().__init__(x, y)
-        self.key = key
-
-    def apply(self, player):
-        if player.inventory.key is not None:
-            return None   # 열쇠는 하나만 소지
-        player.inventory.key = self.key
-        return f"열쇠 획득! [{self.key.zone_id}구역 탈출구]"
-
-    def draw(self, surf, font):
-        r = self.rect()
-        pygame.draw.circle(surf, self.color, (r.left + 5, r.centery), 5, 2)
-        pygame.draw.line(surf, self.color, (r.left + 10, r.centery), (r.right, r.centery), 3)
-        pygame.draw.line(surf, self.color, (r.right - 3, r.centery), (r.right - 3, r.centery + 5), 2)

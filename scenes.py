@@ -2,8 +2,10 @@
 import pygame
 
 from settings import (SCREEN_W, SCREEN_H, HUD_HEIGHT, TILE, ZONE_LAYOUT, MAZE_COLS, MAZE_ROWS,
-                      TRANSITION_TIME, NIGHT_VISION_RADIUS, CENTER_REGEN_PER_SEC,
-                      BG, BLACK, WHITE, GRAY, YELLOW, GOLD, GREEN, RED, PURPLE, HOME_COLOR, DOOR_COLOR)
+                      ZONE_COUNT, TRANSITION_TIME, NIGHT_VISION_RADIUS, CENTER_REGEN_PER_SEC,
+                      CENTER_NAME, FINAL_ZONE_NAME,
+                      BG, BLACK, WHITE, GRAY, YELLOW, GOLD, GREEN, PURPLE, HOME_COLOR, DOOR_COLOR,
+                      BOSS_COLOR)
 from hud import draw_hud, draw_message, draw_text
 
 MOVE_KEYS = {
@@ -17,7 +19,7 @@ ATTACK_KEYS = (pygame.K_j,)   # 마우스 없이 공격: 바라보는 방향으�
 
 
 class Scene:
-    advances_clock = True   # True면 이 화면에 있는 동안 밤 타이머가 흐른다
+    advances_clock = True   # True면 이 화면에 있는 동안 낮 타이머가 흐른다
     pausable = False        # True면 ESC로 일시정지 메뉴를 열 수 있다
 
     def __init__(self, game):
@@ -34,7 +36,7 @@ class Scene:
 
 
 # =====================================================================
-# 중앙(집): 전체 지도 화면. 안전지대 + 체력 회복. 구역을 클릭하면 입장
+# 중앙(과방): 전체 지도 화면. 안전지대 + 체력 회복. 건물을 클릭하면 입장
 # =====================================================================
 class CenterScene(Scene):
     pausable = True
@@ -51,6 +53,9 @@ class CenterScene(Scene):
             y = HUD_HEIGHT + margin_y if ly == 0 else SCREEN_H - margin_y - h
             self.zone_rects[zid] = pygame.Rect(x, y, w, h)
         self.home_pos = (SCREEN_W // 2, HUD_HEIGHT + (SCREEN_H - HUD_HEIGHT) // 2)
+        # 최종 스테이지 건물: 위쪽 두 건물 사이
+        self.final_rect = pygame.Rect(0, 0, 120, 76)
+        self.final_rect.midtop = (SCREEN_W // 2, HUD_HEIGHT + 56)
 
     def handle_event(self, event):
         g = self.game
@@ -59,11 +64,14 @@ class CenterScene(Scene):
                 if rect.collidepoint(event.pos):
                     g.enter_zone(zid)
                     return
-        elif event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_n and not g.is_night:
-                g.start_night()
-            elif event.key == pygame.K_3:
-                g.notify(g.player.drink_potion())
+            if self.final_rect.collidepoint(event.pos):
+                if g.all_keys_collected:
+                    g.enter_final_stage()
+                else:
+                    g.notify(f"잠겨 있다. 키 {ZONE_COUNT}개가 필요하다. "
+                             f"({g.player.inventory.key_count}/{ZONE_COUNT})")
+        elif event.type == pygame.KEYDOWN and event.key == pygame.K_3:
+            g.notify(g.player.drink_potion())
 
     def update(self, dt):
         p = self.game.player
@@ -74,48 +82,78 @@ class CenterScene(Scene):
 
     def draw(self, surf):
         g = self.game
+        inv = g.player.inventory
         surf.fill((20, 26, 22))
         s = self.MINI_SCALE
         mouse = pygame.mouse.get_pos()
         for zid, rect in self.zone_rects.items():
             zone = g.world.zones[zid]
-            # 집에서 각 구역 입구로 이어지는 통로
+            # 과방에서 각 건물 입구로 이어지는 통로
             ex, ey = zone.entrance
             pygame.draw.line(surf, HOME_COLOR, self.home_pos,
                              (rect.x + ex * s + s // 2, rect.y + ey * s + s // 2), 6)
+        pygame.draw.line(surf, BOSS_COLOR, self.home_pos, self.final_rect.midbottom, 6)
+
         for zid, rect in self.zone_rects.items():
             zone = g.world.zones[zid]
             surf.blit(zone.surface(s), rect)
-            dx, dy = zone.exit_door
-            pygame.draw.rect(surf, DOOR_COLOR, (rect.x + dx * s, rect.y + dy * s, s, s))
+            if zone.exit_open:
+                dx, dy = zone.exit_door
+                pygame.draw.rect(surf, GREEN, (rect.x + dx * s, rect.y + dy * s, s, s))
             hover = rect.collidepoint(mouse)
             pygame.draw.rect(surf, YELLOW if hover else GRAY, rect, 3 if hover else 1)
-            label = f"{zid}구역" + (" - 괴물 출몰" if g.is_night and zone.monsters else "")
-            draw_text(surf, g.font_small, label, (rect.x, rect.y - 22), PURPLE if g.is_night else WHITE)
+            label = f"{zid}. {zone.name}"
+            if inv.has_key_for(zid):
+                label += "  [키 획득]"
+            elif g.is_night and zone.monsters:
+                label += f"  - {zone.monster_name} 출몰"
+            color = GOLD if inv.has_key_for(zid) else (PURPLE if g.is_night else WHITE)
+            draw_text(surf, g.font_small, label, (rect.x, rect.y - 22), color)
+
+        # 최종 스테이지 건물 (키 4개 전까지 잠김)
+        unlocked = g.all_keys_collected
+        hover = unlocked and self.final_rect.collidepoint(mouse)
+        pygame.draw.rect(surf, BOSS_COLOR if unlocked else (45, 45, 55), self.final_rect, border_radius=6)
+        pygame.draw.rect(surf, YELLOW if hover else GRAY, self.final_rect, 3 if hover else 1, border_radius=6)
+        draw_text(surf, g.font_small, FINAL_ZONE_NAME, (self.final_rect.centerx, self.final_rect.centery - 12),
+                  WHITE, center=True)
+        status = "입장 가능" if unlocked else f"잠김 ({inv.key_count}/{ZONE_COUNT})"
+        draw_text(surf, g.font_tiny, status, (self.final_rect.centerx, self.final_rect.centery + 12),
+                  GOLD if unlocked else GRAY, center=True)
 
         pygame.draw.circle(surf, HOME_COLOR, self.home_pos, 58)
         pygame.draw.circle(surf, WHITE, self.home_pos, 58, 2)
-        draw_text(surf, g.font, "중앙 (집)", (self.home_pos[0], self.home_pos[1] - 12), WHITE, center=True)
+        draw_text(surf, g.font_small, CENTER_NAME, (self.home_pos[0], self.home_pos[1] - 12), WHITE, center=True)
         draw_text(surf, g.font_small, "안전지대 · 회복", (self.home_pos[0], self.home_pos[1] + 14),
                   WHITE, center=True)
 
-        hint = "구역 클릭: 입장    3: 물약"
-        hint += "    N: 밤 시작(파밍 끝)" if not g.is_night else "    괴물을 처치해 열쇠를 얻자"
-        draw_text(surf, g.font_small, hint, (SCREEN_W // 2, SCREEN_H - 18), GRAY, center=True)
+        if unlocked:
+            goal = f"{FINAL_ZONE_NAME}을 클릭해 최종 보스에게 도전하자"
+        elif g.is_night:
+            goal = "아무 건물에서나 괴물을 쓰러뜨려 키를 얻자"
+        else:
+            goal = "밤이 오기 전에 무기를 모으자"
+        draw_text(surf, g.font_small, f"건물 클릭: 입장    3: 물약    |    {goal}",
+                  (SCREEN_W // 2, SCREEN_H - 18), GRAY, center=True)
 
         draw_hud(surf, g, current_zone_id=None)
         draw_message(surf, g, SCREEN_H - 50)
 
 
 # =====================================================================
-# 구역(서브 미로) 화면: 탐험, 파밍, 전투, 탈출
+# 건물(서브 미로) / 최종 스테이지 화면: 탐험, 파밍, 전투, 탈출
 # =====================================================================
 class ZoneScene(Scene):
     pausable = True
+
     def __init__(self, game, zone):
         super().__init__(game)
         self.zone = zone
         self.dark = pygame.Surface((SCREEN_W, SCREEN_H - HUD_HEIGHT), pygame.SRCALPHA)
+
+    @property
+    def advances_clock(self):
+        return not self.zone.is_final   # 최종 스테이지에서는 낮 타이머가 멈춤
 
     @staticmethod
     def to_world(screen_pos):
@@ -135,8 +173,6 @@ class ZoneScene(Scene):
         elif event.type == pygame.KEYDOWN:
             if event.key in ATTACK_KEYS:
                 g.notify(p.attack(self.facing_target(), self.zone))       # 바라보는 방향으로 공격
-            elif event.key == pygame.K_SPACE:
-                g.notify(p.inventory.cycle())
             elif event.key in (pygame.K_1, pygame.K_2):
                 g.notify(p.inventory.select_slot(event.key - pygame.K_1))
             elif event.key == pygame.K_3:
@@ -156,55 +192,54 @@ class ZoneScene(Scene):
                 break
 
         zone.update(dt, p, g)
-        if not p.alive:
-            g.on_player_death()
+        if not p.alive and g.scene is self:
+            g.on_player_death(zone)
 
     def on_player_moved(self):
         g, p, zone = self.game, self.game.player, self.zone
         pos = (p.x, p.y)
         zone.collect_pickups(p, g)
-        if pos == zone.entrance:
+        if pos == zone.entrance and not zone.is_final:   # 최종 스테이지는 되돌아갈 수 없음
             g.return_to_center()
-        elif pos == zone.exit_door:
-            key = p.inventory.key
-            if key is None:
-                g.notify("탈출구다! 하지만 열쇠가 필요하다.")
-            elif key.zone_id != zone.id:
-                g.notify(f"열리지 않는다... 이 열쇠는 {key.zone_id}구역용이다.")
+        elif pos == zone.exit_door and zone.exit_open:
+            if zone.is_final:
+                g.graduate()
             else:
-                g.win()
+                g.enter_final_stage()
+        elif pos == zone.exit_door and zone.is_final:
+            g.notify("탈출구가 잠겨 있다. 보스를 쓰러뜨려야 열린다.")
 
     def draw(self, surf):
         g, p, zone = self.game, self.game.player, self.zone
         surf.fill(BG)
         surf.blit(zone.surface(), (0, HUD_HEIGHT))
 
-        # 입구(집으로) / 탈출구
-        ex, ey = zone.entrance
-        r = pygame.Rect(ex * TILE, HUD_HEIGHT + ey * TILE, TILE, TILE)
-        pygame.draw.rect(surf, HOME_COLOR, r)
-        draw_text(surf, g.font_small, "H", r.center, WHITE, center=True)
-        dx, dy = zone.exit_door
-        r = pygame.Rect(dx * TILE, HUD_HEIGHT + dy * TILE, TILE, TILE)
-        key = p.inventory.key
-        door_color = GREEN if key and key.zone_id == zone.id else DOOR_COLOR
-        pygame.draw.rect(surf, door_color, r)
-        pygame.draw.rect(surf, GOLD, r, 2)
-        draw_text(surf, g.font_tiny, "EXIT", r.center, WHITE, center=True)
+        # 입구(과방으로) / 탈출구
+        if not zone.is_final:
+            ex, ey = zone.entrance
+            r = pygame.Rect(ex * TILE, HUD_HEIGHT + ey * TILE, TILE, TILE)
+            pygame.draw.rect(surf, HOME_COLOR, r)
+            draw_text(surf, g.font_small, "H", r.center, WHITE, center=True)
+        if zone.exit_open or zone.is_final:   # 일반 건물은 마지막 키를 얻어야 탈출구가 보임
+            dx, dy = zone.exit_door
+            r = pygame.Rect(dx * TILE, HUD_HEIGHT + dy * TILE, TILE, TILE)
+            pygame.draw.rect(surf, GREEN if zone.exit_open else DOOR_COLOR, r)
+            pygame.draw.rect(surf, GOLD, r, 2)
+            draw_text(surf, g.font_tiny, "EXIT", r.center, WHITE, center=True)
 
         for item in zone.pickups:
             item.draw(surf, g.font_small)
         for m in zone.monsters:
-            m.draw(surf)
+            m.draw(surf, g.font_tiny)
         for proj in zone.projectiles:
             proj.draw(surf)
         p.draw(surf)
 
-        if g.is_night:
+        if g.is_night or zone.is_final:
             self._draw_darkness(surf)
 
         draw_hud(surf, g, current_zone_id=zone.id)
-        draw_text(surf, g.font_small, f"{zone.id}구역", (8, HUD_HEIGHT + 4), WHITE)
+        draw_text(surf, g.font_small, zone.name, (8, HUD_HEIGHT + 4), WHITE)
         draw_message(surf, g, SCREEN_H - 24)
 
     def _draw_darkness(self, surf):
@@ -256,31 +291,23 @@ class TransitionScene(Scene):
                   GRAY, center=True)
 
 
-
-
 # =====================================================================
-# 일시정지 메뉴 (ESC). 멈춘 화면을 뒤에 어둡게 깔고 메뉴를 띄운다
+# 메뉴 화면 공통 부모: 선택지 목록 + 방향키/마우스 선택
 # =====================================================================
-class PauseScene(Scene):
-    advances_clock = False   # 일시정지 중에는 밤 타이머도 멈춤
+class MenuScene(Scene):
+    advances_clock = False
 
-    def __init__(self, game, paused_scene):
+    def __init__(self, game, title, options, subtitle=None, background=None, on_cancel=None):
+        """options: [(글자, 실행할 함수), ...]  background: 뒤에 어둡게 깔 Scene (없으면 검은 화면)"""
         super().__init__(game)
-        self.paused_scene = paused_scene
-        self.options = [
-            ("계속하기", self.resume),
-            ("처음부터 다시", self.game.reset),
-            ("게임 종료", self.quit),
-        ]
+        self.title = title
+        self.subtitle = subtitle
+        self.options = options
+        self.background = background
+        self.on_cancel = on_cancel   # ESC를 눌렀을 때 (None이면 ESC 무시)
         self.selected = 0
         self.shade = pygame.Surface((SCREEN_W, SCREEN_H), pygame.SRCALPHA)
         self.shade.fill((0, 0, 0, 170))
-
-    def resume(self):
-        self.game.change_scene(self.paused_scene)
-
-    def quit(self):
-        self.game.running = False
 
     def option_rect(self, index):
         rect = pygame.Rect(0, 0, 260, 48)
@@ -289,8 +316,8 @@ class PauseScene(Scene):
 
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_ESCAPE:
-                self.resume()
+            if event.key == pygame.K_ESCAPE and self.on_cancel:
+                self.on_cancel()
             elif event.key in (pygame.K_UP, pygame.K_w):
                 self.selected = (self.selected - 1) % len(self.options)
             elif event.key in (pygame.K_DOWN, pygame.K_s):
@@ -301,36 +328,71 @@ class PauseScene(Scene):
             for i in range(len(self.options)):
                 if self.option_rect(i).collidepoint(event.pos):
                     self.selected = i
-        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == LEFT_CLICK:
             for i, (_, action) in enumerate(self.options):
                 if self.option_rect(i).collidepoint(event.pos):
                     action()
                     return
 
     def draw(self, surf):
-        self.paused_scene.draw(surf)   # 멈춘 게임 화면을 그대로 뒤에 보여줌
-        surf.blit(self.shade, (0, 0))
+        if self.background:
+            self.background.draw(surf)   # 멈춘 게임 화면을 그대로 뒤에 보여줌
+            surf.blit(self.shade, (0, 0))
+        else:
+            surf.fill(BLACK)
         g = self.game
-        draw_text(surf, g.font_big, "일시정지", (SCREEN_W // 2, SCREEN_H // 2 - 100), WHITE, center=True)
+        draw_text(surf, g.font_big, self.title, (SCREEN_W // 2, SCREEN_H // 2 - 120), WHITE, center=True)
+        if self.subtitle:
+            draw_text(surf, g.font, self.subtitle, (SCREEN_W // 2, SCREEN_H // 2 - 72), GRAY, center=True)
         for i, (label, _) in enumerate(self.options):
             rect = self.option_rect(i)
             active = i == self.selected
             pygame.draw.rect(surf, (60, 60, 75) if active else (30, 30, 40), rect, border_radius=8)
             pygame.draw.rect(surf, YELLOW if active else GRAY, rect, 2, border_radius=8)
             draw_text(surf, g.font, label, rect.center, YELLOW if active else WHITE, center=True)
-        draw_text(surf, g.font_small, "↑↓/마우스: 선택   Enter/클릭: 확인   ESC: 계속하기",
-                  (SCREEN_W // 2, SCREEN_H // 2 + 175), GRAY, center=True)
+        hint = "↑↓/마우스: 선택   Enter/클릭: 확인"
+        if self.on_cancel:
+            hint += "   ESC: 계속하기"
+        draw_text(surf, g.font_small, hint, (SCREEN_W // 2, SCREEN_H // 2 + 175), GRAY, center=True)
+
+
+class PauseScene(MenuScene):
+    """ESC 일시정지 메뉴."""
+
+    def __init__(self, game, paused_scene):
+        super().__init__(game, "일시정지",
+                         [("계속하기", self.resume),
+                          ("처음부터 다시", game.reset),
+                          ("게임 종료", self.quit)],
+                         background=paused_scene, on_cancel=self.resume)
+        self.paused_scene = paused_scene
+
+    def resume(self):
+        self.game.change_scene(self.paused_scene)
+
+    def quit(self):
+        self.game.running = False
+
+
+class GraduationScene(MenuScene):
+    """최종 탈출(졸업) 후 진로 선택: 대학원 vs 취직."""
+
+    def __init__(self, game):
+        super().__init__(game, "졸업을 축하합니다!",
+                         [("대학원 진학", lambda: game.finish("grad")),
+                          ("취업", lambda: game.finish("job"))],
+                         subtitle=f"{game.day}일 만에 학교를 탈출했다. 이제 어디로 갈까?")
 
 
 # =====================================================================
-# 게임 종료 화면 (탈출 성공 / 게임 오버)
+# 게임 종료 화면 (진로 엔딩 / 게임 오버)
 # =====================================================================
 class EndScene(Scene):
     advances_clock = False
 
-    def __init__(self, game, title, subtitle, color):
+    def __init__(self, game, title, subtitle, color, note=None):
         super().__init__(game)
-        self.title, self.subtitle, self.color = title, subtitle, color
+        self.title, self.subtitle, self.color, self.note = title, subtitle, color, note
 
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN:
@@ -342,7 +404,9 @@ class EndScene(Scene):
     def draw(self, surf):
         surf.fill(BLACK)
         g = self.game
-        draw_text(surf, g.font_big, self.title, (SCREEN_W // 2, SCREEN_H // 2 - 40), self.color, center=True)
-        draw_text(surf, g.font, self.subtitle, (SCREEN_W // 2, SCREEN_H // 2 + 10), WHITE, center=True)
-        draw_text(surf, g.font_small, "R: 처음부터 다시    ESC: 종료", (SCREEN_W // 2, SCREEN_H // 2 + 60),
+        draw_text(surf, g.font_big, self.title, (SCREEN_W // 2, SCREEN_H // 2 - 50), self.color, center=True)
+        draw_text(surf, g.font, self.subtitle, (SCREEN_W // 2, SCREEN_H // 2), WHITE, center=True)
+        if self.note:
+            draw_text(surf, g.font_small, self.note, (SCREEN_W // 2, SCREEN_H // 2 + 40), PURPLE, center=True)
+        draw_text(surf, g.font_small, "R: 처음부터 다시    ESC: 종료", (SCREEN_W // 2, SCREEN_H // 2 + 90),
                   GRAY, center=True)
