@@ -12,7 +12,8 @@ MOVE_KEYS = {
     pygame.K_a: (-1, 0), pygame.K_LEFT: (-1, 0),
     pygame.K_d: (1, 0), pygame.K_RIGHT: (1, 0),
 }
-RIGHT_CLICK = 3
+LEFT_CLICK, RIGHT_CLICK = 1, 3
+ATTACK_KEYS = (pygame.K_j,)   # 마우스 없이 공격: 바라보는 방향으로
 
 
 class Scene:
@@ -33,7 +34,7 @@ class Scene:
 
 
 # =====================================================================
-# 중앙(집): 전체 지도 화면. 안전지대 + 체력 회복. 구역을 우클릭하면 입장
+# 중앙(집): 전체 지도 화면. 안전지대 + 체력 회복. 구역을 클릭하면 입장
 # =====================================================================
 class CenterScene(Scene):
     pausable = True
@@ -53,7 +54,7 @@ class CenterScene(Scene):
 
     def handle_event(self, event):
         g = self.game
-        if event.type == pygame.MOUSEBUTTONDOWN and event.button == RIGHT_CLICK:
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button in (LEFT_CLICK, RIGHT_CLICK):
             for zid, rect in self.zone_rects.items():
                 if rect.collidepoint(event.pos):
                     g.enter_zone(zid)
@@ -98,7 +99,7 @@ class CenterScene(Scene):
         draw_text(surf, g.font_small, "안전지대 · 회복", (self.home_pos[0], self.home_pos[1] + 14),
                   WHITE, center=True)
 
-        hint = "구역 우클릭: 입장    3: 물약"
+        hint = "구역 클릭: 입장    3: 물약"
         hint += "    N: 밤 시작(파밍 끝)" if not g.is_night else "    괴물을 처치해 열쇠를 얻자"
         draw_text(surf, g.font_small, hint, (SCREEN_W // 2, SCREEN_H - 18), GRAY, center=True)
 
@@ -121,12 +122,20 @@ class ZoneScene(Scene):
         """화면 좌표 -> 미로(월드) 좌표 (HUD 높이만큼 보정)."""
         return screen_pos[0], screen_pos[1] - HUD_HEIGHT
 
+    def facing_target(self):
+        """플레이어가 바라보는 방향으로 한 칸 앞 지점 (키보드 공격용 조준점)."""
+        p = self.game.player
+        cx, cy = p.world_center()
+        return cx + p.facing[0] * TILE, cy + p.facing[1] * TILE
+
     def handle_event(self, event):
         g, p = self.game, self.game.player
-        if event.type == pygame.MOUSEBUTTONDOWN and event.button == RIGHT_CLICK:
-            g.notify(p.attack(self.to_world(event.pos), self.zone))
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == LEFT_CLICK:
+            g.notify(p.attack(self.to_world(event.pos), self.zone))      # 마우스 방향으로 공격
         elif event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_SPACE:
+            if event.key in ATTACK_KEYS:
+                g.notify(p.attack(self.facing_target(), self.zone))       # 바라보는 방향으로 공격
+            elif event.key == pygame.K_SPACE:
                 g.notify(p.inventory.cycle())
             elif event.key in (pygame.K_1, pygame.K_2):
                 g.notify(p.inventory.select_slot(event.key - pygame.K_1))
