@@ -47,6 +47,16 @@ def load_sprite(rel_path, box, flash=False):
     return _sprite_cache[key]
 
 
+def rotated_sprite(rel_path, box, angle):
+    """load_sprite 결과를 angle도(반시계) 돌린 것. 1도 단위로 캐시."""
+    angle = int(round(angle)) % 360
+    key = ("rot", rel_path, box, angle)
+    if key not in _sprite_cache:
+        base = load_sprite(rel_path, box)
+        _sprite_cache[key] = pygame.transform.rotate(base, angle) if base else None
+    return _sprite_cache[key]
+
+
 class Theme:
     """단색 사각형 테마 (기본값)."""
 

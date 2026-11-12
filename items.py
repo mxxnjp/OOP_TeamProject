@@ -7,8 +7,10 @@ import pygame
 
 from settings import (TILE, HUD_HEIGHT, SPEAR_DAMAGE, SPEAR_COOLDOWN,
                       SPEAR_KNOCKBACK, BOW_DAMAGE, BOW_COOLDOWN, BOW_START_ARROWS,
+                      ITEM_SPRITES, ITEM_SPRITE_SIZE, SPEAR_SWING_SIZE, SPEAR_SPRITE_ANGLE,
                       WHITE, RED, YELLOW)
 from projectiles import Arrow
+from themes import load_sprite, rotated_sprite
 
 
 # =====================================================================
@@ -86,6 +88,12 @@ class Spear(Weapon):
             return
         cx, cy = player.screen_center()
         fx, fy = player.facing
+        # 창 그림을 바라보는 방향으로 돌려서 한 칸 앞에 찌르듯이 그림
+        heading = math.degrees(math.atan2(-fy, fx))
+        img = rotated_sprite(ITEM_SPRITES["spear"], SPEAR_SWING_SIZE, heading - SPEAR_SPRITE_ANGLE)
+        if img:
+            surf.blit(img, img.get_rect(center=(cx + fx * TILE * 0.8, cy + fy * TILE * 0.8)))
+            return
         end = (cx + fx * TILE * 1.2, cy + fy * TILE * 1.2)
         pygame.draw.line(surf, YELLOW, (cx, cy), end, 4)
 
@@ -187,6 +195,7 @@ class Inventory:
 # =====================================================================
 class Pickup(ABC):
     color = WHITE
+    sprite_key = None   # ITEM_SPRITES의 키. 그림이 있으면 그림, 없으면 draw_shape()
 
     def __init__(self, x, y):
         self.x, self.y = x, y
@@ -201,6 +210,14 @@ class Pickup(ABC):
                            TILE - pad * 2, TILE - pad * 2)
 
     def draw(self, surf, font):
+        img = load_sprite(ITEM_SPRITES.get(self.sprite_key), ITEM_SPRITE_SIZE) if self.sprite_key else None
+        if img:
+            surf.blit(img, img.get_rect(center=self.rect().center))
+        else:
+            self.draw_shape(surf)
+
+    def draw_shape(self, surf):
+        """그림 파일이 없을 때 쓰는 도형."""
         pygame.draw.rect(surf, self.color, self.rect(), border_radius=4)
 
 
@@ -208,12 +225,13 @@ class WeaponPickup(Pickup):
     def __init__(self, x, y, weapon_cls):
         super().__init__(x, y)
         self.weapon_cls = weapon_cls
+        self.sprite_key = weapon_cls.name
         self.color = (200, 200, 120) if weapon_cls is Spear else (160, 110, 60)
 
     def apply(self, player):
         return player.inventory.add_weapon(self.weapon_cls())
 
-    def draw(self, surf, font):
+    def draw_shape(self, surf):
         r = self.rect()
         if self.weapon_cls is Spear:
             pygame.draw.line(surf, self.color, r.bottomleft, r.topright, 4)
@@ -225,12 +243,13 @@ class WeaponPickup(Pickup):
 
 class PotionPickup(Pickup):
     color = RED
+    sprite_key = "potion"
 
     def apply(self, player):
         player.inventory.potions += 1
         return "물약 획득!"
 
-    def draw(self, surf, font):
+    def draw_shape(self, surf):
         r = self.rect()
         pygame.draw.circle(surf, self.color, r.center, r.width // 2)
         pygame.draw.rect(surf, WHITE, (r.centerx - 3, r.top - 4, 6, 6))

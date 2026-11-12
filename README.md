@@ -71,6 +71,7 @@ python main.py
 - 밸런스 조정 (특히 최종 보스 난이도, 무기 파밍 양)
 - 배경·플레이어·괴물 디자인 (`draw()` 메서드와 `Maze.render()`만 바꾸면 됨)
 - 최종 보스·플레이어 그림 (괴물 그림은 `settings.MONSTER_SPRITES`, 크기는 `MONSTER_SPRITE_SIZE`)
+- (완료) 무기·물약·화살 그림: `assets/items/`, 설정은 `settings.ITEM_SPRITES` (바닥 아이템, 날아가는 화살, 창 찌르기, HUD 칸)
 - 게임 시작 / 엔딩 스토리 화면
 - 효과음 / 배경음
 - (보류) 전투 시 주인공 시점 카메라

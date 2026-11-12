@@ -1,8 +1,10 @@
 """상단 HUD(목숨, 체력, 인벤토리, 낮/밤, 전체 지도)와 공용 그리기 함수."""
 import pygame
 
+from themes import load_sprite
+
 from settings import (SCREEN_W, HUD_HEIGHT, ZONE_LAYOUT, PLAYER_MAX_HP, FINAL_ZONE_ID,
-                      ZONE_NAMES, BOSS_NAME,
+                      ZONE_NAMES, BOSS_NAME, ITEM_SPRITES,
                       HUD_BG, WHITE, GRAY, RED, DARK_RED, GREEN, GOLD, YELLOW,
                       HOME_COLOR, PURPLE)
 
@@ -20,6 +22,18 @@ def draw_text(surf, font, text, pos, color=WHITE, center=False):
     rect = img.get_rect(center=pos) if center else img.get_rect(topleft=pos)
     surf.blit(img, rect)
     return rect
+
+
+def _slot_icon(surf, slot_rect, key, owned):
+    """인벤토리 칸 왼쪽에 아이템 그림. 아직 없는 아이템은 흐리게. 그림이 없으면 False."""
+    img = load_sprite(ITEM_SPRITES.get(key), 28)
+    if not img:
+        return False
+    if not owned:
+        img = img.copy()
+        img.set_alpha(70)
+    surf.blit(img, img.get_rect(center=(slot_rect.x + 26, slot_rect.centery + 2)))
+    return True
 
 
 def draw_minimap(surf, rect, current_zone_id, is_night):
@@ -74,13 +88,17 @@ def draw_hud(surf, game, current_zone_id=None):
         pygame.draw.rect(surf, YELLOW if selected else GRAY, r, 2, border_radius=5)
         text = weapon.label() if weapon else f"{name} (없음)"
         draw_text(surf, f, key_label, (r.x + 5, r.y + 2), GRAY)
-        draw_text(surf, f, text, r.center, WHITE if weapon else GRAY, center=True)
+        icon = _slot_icon(surf, r, ("spear", "bow")[int(key_label) - 1], owned=weapon is not None)
+        draw_text(surf, f, text, (r.centerx + (16 if icon else 0), r.centery),
+                  WHITE if weapon else GRAY, center=True)
         x += 100
     r = pygame.Rect(x, 10, 92, 40)
     pygame.draw.rect(surf, (50, 50, 60), r, border_radius=5)
     pygame.draw.rect(surf, GRAY, r, 2, border_radius=5)
     draw_text(surf, f, "3", (r.x + 5, r.y + 2), GRAY)
-    draw_text(surf, f, f"물약 x{inv.potions}", r.center, RED if inv.potions else GRAY, center=True)
+    icon = _slot_icon(surf, r, "potion", owned=inv.potions > 0)
+    draw_text(surf, f, f"물약 x{inv.potions}" if not icon else f"x{inv.potions}",
+              (r.centerx + (16 if icon else 0), r.centery), RED if inv.potions else GRAY, center=True)
 
     # 키 4칸 (건물별)
     draw_text(surf, f, "키", (260, 64))

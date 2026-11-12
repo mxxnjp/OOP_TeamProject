@@ -3,7 +3,9 @@ import math
 import pygame
 
 from settings import (TILE, HUD_HEIGHT, ARROW_SPEED, BOW_DAMAGE, DART_SPEED,
-                      MONSTER_RANGED_DAMAGE, WHITE, PURPLE)
+                      MONSTER_RANGED_DAMAGE, WHITE, PURPLE,
+                      ITEM_SPRITES, ARROW_SPRITE_SIZE, ARROW_SPRITE_ANGLE)
+from themes import rotated_sprite
 
 
 class Projectile:
@@ -47,7 +49,13 @@ class Arrow(Projectile):
         super().__init__(x, y, dx, dy, ARROW_SPEED, BOW_DAMAGE, True, WHITE, 3)
 
     def draw(self, surf):
-        # 진행 방향으로 짧은 선을 그려서 화살처럼 보이게
+        # 화살 그림을 날아가는 방향으로 돌려서 그림 (화면 y는 아래가 +라서 부호 반전)
+        heading = math.degrees(math.atan2(-self.vy, self.vx))
+        img = rotated_sprite(ITEM_SPRITES["arrow"], ARROW_SPRITE_SIZE, heading - ARROW_SPRITE_ANGLE)
+        if img:
+            surf.blit(img, img.get_rect(center=(self.x, self.y + HUD_HEIGHT)))
+            return
+        # 그림이 없으면 진행 방향으로 짧은 선
         speed = math.hypot(self.vx, self.vy) or 1
         tail = (self.x - self.vx / speed * 10, self.y - self.vy / speed * 10 + HUD_HEIGHT)
         pygame.draw.line(surf, self.color, tail, (self.x, self.y + HUD_HEIGHT), 2)

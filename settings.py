@@ -32,6 +32,16 @@ MONSTER_NAMES = {1: "책괴물", 2: "BOO", 3: "물귀신", 4: "경비아저씨"}
 MONSTER_SPRITES = {1: "monsters/book.png", 2: "monsters/boo.png",
                    3: "monsters/ghost.png", 4: "monsters/guard.png"}
 MONSTER_SPRITE_SIZE = 44   # 괴물 그림이 들어갈 최대 크기(px). 타일(32)보다 조금 크게
+
+# 무기·물약 그림(assets/ 기준). 없으면 도형으로 그림
+ITEM_SPRITES = {"spear": "items/spear.png", "bow": "items/bow.png",
+                "potion": "items/potion.png", "arrow": "items/arrow.png"}
+ITEM_SPRITE_SIZE = 28      # 바닥 아이템 크기(px)
+ARROW_SPRITE_SIZE = 24     # 날아가는 화살 크기(px)
+SPEAR_SWING_SIZE = 40      # 창 휘두르는 그림 크기(px)
+# 그림 속에서 끝(촉)이 가리키는 방향(도, 오른쪽=0, 위=90). 회전시킬 때 기준
+SPEAR_SPRITE_ANGLE = 30
+ARROW_SPRITE_ANGLE = 180
 FINAL_ZONE_NAME = "교수연구동"
 BOSS_NAME = "교수님"
 KEY_ORDINALS = ("첫번째", "두번째", "세번째", "네번째")
