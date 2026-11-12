@@ -1,4 +1,9 @@
 """Game: 메인 루프, 전역 상태(플레이어, 월드, 낮/밤), 화면 전환을 관리."""
+import os
+
+# 화면을 확대할 때 계단 현상 대신 부드럽게 보간 (창을 만들기 전에 설정해야 적용됨)
+os.environ.setdefault("SDL_RENDER_SCALE_QUALITY", "linear")
+
 import pygame
 
 from settings import (SCREEN_W, SCREEN_H, FPS, TITLE, FONT_NAMES, PLAYER_LIVES,
@@ -12,7 +17,8 @@ class Game:
     def __init__(self, seed=None):
         pygame.init()
         pygame.display.set_caption(TITLE)
-        self.screen = pygame.display.set_mode((SCREEN_W, SCREEN_H))
+        # SCALED: 800x640 해상도는 그대로 두고 창/모니터 크기에 맞게 확대 (마우스 좌표도 자동 보정)
+        self.screen = pygame.display.set_mode((SCREEN_W, SCREEN_H), pygame.SCALED)
         self.clock = pygame.time.Clock()
         self.font_tiny = pygame.font.SysFont(FONT_NAMES, 11, bold=True)
         self.font_small = pygame.font.SysFont(FONT_NAMES, 15)
@@ -93,11 +99,20 @@ class Game:
     def win(self):
         self.change_scene(EndScene(self, "탈출 성공!", f"{self.day}일 만에 미로를 빠져나왔다.", GREEN))
 
+    def toggle_fullscreen(self):
+        """F11: 어느 화면에서든 전체화면 <-> 창 모드. 지원 안 되는 환경이면 메시지만 띄움."""
+        try:
+            pygame.display.toggle_fullscreen()
+        except pygame.error:
+            self.notify("이 환경에서는 전체화면을 지원하지 않습니다.")
+
     # ---------------- 메인 루프 ----------------
     def step(self, dt, events):
         for event in events:
             if event.type == pygame.QUIT:
                 self.running = False
+            elif event.type == pygame.KEYDOWN and event.key == pygame.K_F11:
+                self.toggle_fullscreen()
             elif (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE
                   and self.scene.pausable):
                 self.change_scene(PauseScene(self, self.scene))
