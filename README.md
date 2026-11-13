@@ -85,7 +85,7 @@ python main.py
 | 장소 | 괴물 |
 |---|---|
 | 중앙: 과방(교양관) | – (안전지대) |
-| 1. 도서관 | 책괴물 (`monsters/book.png`) |
+| 1. 도서관 | 책귀 (`monsters/book.png`) |
 | 2. 학생회관 | BOO (`monsters/boo.png`) |
 | 3. 명수당 | 물귀신 (`monsters/ghost.png`) |
 | 4. 기숙사 | 경비아저씨 (`monsters/guard.png`) |

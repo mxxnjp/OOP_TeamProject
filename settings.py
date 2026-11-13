@@ -30,7 +30,7 @@ CENTER_IMAGE = "buildings/center_door.png"   # 지도 가운데 과방 그림 (�
 # ---------------- 테마(이름) : 여기만 바꾸면 게임 안 글자가 다 바뀜 ----------------
 CENTER_NAME = "과방 (교양관)"
 ZONE_NAMES = {1: "도서관", 2: "학생회관", 3: "명수당", 4: "기숙사"}
-MONSTER_NAMES = {1: "책괴물", 2: "BOO", 3: "물귀신", 4: "경비아저씨"}
+MONSTER_NAMES = {1: "책귀", 2: "BOO", 3: "물귀신", 4: "경비아저씨"}
 # 괴물 그림(assets/ 기준, 배경 투명 PNG). 없으면 사각형으로 그림
 MONSTER_SPRITES = {1: "monsters/book.png", 2: "monsters/boo.png",
                    3: "monsters/ghost.png", 4: "monsters/guard.png"}
