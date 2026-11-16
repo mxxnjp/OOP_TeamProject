@@ -1,0 +1,106 @@
+{
+  "tile_size": [
+    64,
+    64
+  ],
+  "floor_rule": "same floor_main tile repeated per zone",
+  "wall_rule": "wall and door blocked; floor walkable",
+  "dorm_wall_selection": {
+    "door_weight": 0.7,
+    "plain_wall_weight": 0.3
+  },
+  "zones": {
+    "library": {
+      "floor": [
+        "floor_main.png"
+      ],
+      "wall": [
+        "bookshelf.png",
+        "bookshelf_cobweb.png",
+        "bookshelf_dusty.png"
+      ],
+      "door": [
+        "glass_door.png",
+        "study_room.png"
+      ],
+      "decor": [
+        "books.png",
+        "cart.png",
+        "globe.png",
+        "lamp.png"
+      ]
+    },
+    "pond": {
+      "floor": [
+        "floor_main.png"
+      ],
+      "wall": [
+        "lotus_moss_stone.png",
+        "lotus_stone_relief.png",
+        "mossy_stone_dense.png",
+        "underwater_stone.png",
+        "underwater_stone_moss.png"
+      ],
+      "door": [
+        "iron_gate.png",
+        "water_tunnel.png"
+      ],
+      "decor": [
+        "lily_pads.png",
+        "reeds.png",
+        "rock.png",
+        "stone_lantern.png"
+      ]
+    },
+    "student_hall": {
+      "floor": [
+        "floor_main.png"
+      ],
+      "wall": [
+        "hall_wall.png",
+        "notice_wall.png",
+        "web_wall.png"
+      ],
+      "door": [
+        "club_room_a.png",
+        "club_room_b.png",
+        "club_room_c.png",
+        "club_room_d.png"
+      ],
+      "decor": [
+        "bench.png",
+        "locker.png",
+        "plant.png",
+        "vending_machine.png"
+      ]
+    },
+    "dorm": {
+      "floor": [
+        "floor_main.png"
+      ],
+      "wall": [
+        "cobweb_wall.png",
+        "dorm_wall.png",
+        "notice_wall.png"
+      ],
+      "door": [
+        "room_301.png",
+        "room_302.png",
+        "room_303.png",
+        "room_304.png",
+        "room_305.png",
+        "room_306.png",
+        "room_307.png",
+        "room_308.png",
+        "room_309.png",
+        "room_310.png"
+      ],
+      "decor": [
+        "laundry_basket.png",
+        "shoe_rack.png",
+        "wall_lamp.png",
+        "washer.png"
+      ]
+    }
+  }
+}

@@ -5,11 +5,16 @@ python main.py
 ```
 
 ## 게임 흐름
+0. **캐릭터 선택**: 남학생 / 여학생 (앞모습 카드, ←→·마우스로 고르고 Enter·클릭). 플레이어도 움직이는 방향을 바라봄
+   - 그림: `assets/player/boy_down|up|left|right.png`, `girl_...` (없으면 색 동그라미로 대체)
+   - 앞·왼쪽·뒤·오른쪽이 가로로 이어진 그림 한 장은 `python tools/cut_sprite_sheet.py 그림.png player boy` 로 4장 생성
+     (지금 그림은 `--dark=12 --no-outline`으로 자름: 눈·머리 안 뚫리게 + 바깥 검은 테두리 제거)
 1. **시작**: 중앙 **과방(교양관)** 에서 시작 → 전체 지도 화면 (안전지대, 체력 회복)
-2. **낮 (1일차 60초 → 2일차 40초 → 3일차 20초 → 4일차부터 10초)**: 건물(도서관 / 학생회관 / 명수당 / 기숙사)을 클릭해서 입장 → 무기·물약 파밍 (지나가면 자동 습득)
+2. **낮 (1일차 60초 → 2일차 40초 → 3일차 20초 → 4일차부터 10초)**: 건물(1 도서관 / 2 학생회관 / 3 명수당 / 4 기숙사)을 클릭해서 입장 → 무기·물약 파밍 (지나가면 자동 습득)
    - 건물 입구(`H` 칸)로 가면 과방으로 복귀. 여러 건물을 돌아다닐 수 있음
    - 안 주운 아이템은 사라지지 않고 **다음 날까지 누적**됨 (미로는 고정)
 3. **밤 (시간 제한 없음)**: 낮 시간이 끝나면 **그 자리에서 바로** 밤 → 아직 키를 못 얻은 건물에 괴물 등장
+   - 밤에는 아이템이 **생기지도, 보이지도, 주워지지도 않음** (바닥에 남은 아이템은 다음 낮에 다시 주울 수 있음. 최종 스테이지 물약은 예외)
    - 아무 건물에서나 괴물 1마리를 쓰러뜨리면 그 건물의 **키** 획득 → "첫번째 키를 획득하였습니다" → 다시 낮
 4. 반복해서 건물 4곳의 키를 모두 모으면 → "모든 구역 키를 획득하였습니다"
    - 마지막 괴물을 쓰러뜨린 건물에 **탈출구(EXIT)** 가 나타남 (낮으로 바뀌지 않음)
@@ -37,11 +42,13 @@ python main.py
 | `game.py` | `Game` | 메인 루프, 낮 타이머, 낮/밤 전환, 키 획득, 화면 전환, 사망/엔딩 처리 |
 | `scenes.py` | `Scene` → `CenterScene`, `ZoneScene`, `TransitionScene`, `MenuScene`(→ `PauseScene`, `GraduationScene`), `EndScene` | 화면별 입력·업데이트·그리기 |
 | `world.py` | `Maze`, `Zone` → `FinalZone`, `World` | 미로 생성(백트래킹)/맵 파일 읽기·BFS 길찾기, 건물별 아이템/괴물, 최종 스테이지 |
-| `themes.py` | `Theme` → `ArtTheme` | 미로 그리기 (단색 / 아트 이미지에서 잘라낸 타일) |
+| `themes.py` | `Theme` → `CourtyardTheme` → `ZoneTileTheme`, `TileTheme`, `ImageTheme` | 미로 그리기 (건물+앞마당 / 타일 세트 / 미로 그림 통째로) |
 | `entities.py` | `Entity` → `Player`, `Monster` → `Boss` | 체력·이동·공격, 괴물 AI(추적/배회/근접/독침), 보스(탈출구 지키기) |
 | `items.py` | `Weapon` → `Spear`, `Bow` / `Pickup` → `WeaponPickup`, `PotionPickup` / `Key`, `Inventory` | 무기·아이템·키·인벤토리 |
 | `projectiles.py` | `Projectile` → `Arrow`, `PoisonDart` | 화살·독침 |
-| `hud.py` | – | 상단 HUD(목숨, 체력 10칸, 슬롯, 키 4칸, 낮 타이머, 전체 지도) |
+| (과방 지도) | `hud.CenterMapSkin` | 메인 지도 디자인 그림 `assets/ui/center_design.png`의 배치대로 건물(`assets/buildings/`)·과방(`buildings/center_room.png`)·이름표 틀을 놓음. 색감은 디자인 그림 속 같은 건물의 색 분포에 자동으로 맞춤(`hud.match_tone`), 배경은 `settings.CENTER_TONE_BG`. 새 건물 그림 배경 지우기: `python tools/cut_background.py 그림 assets/buildings/이름.png`. 배경은 `settings.MAIN_BACKGROUND`(밤하늘·숲, HUD 뒤까지 화면 전체, `hud.screen_background`). 건물 영역은 `settings.CENTER_MAP_CROPS` |
+| `buttons.py` | `SimpleButton` → `ZoomButton` | 9강 버튼 클래스 (normal/hover/active 상태, `handleEvent`, `draw`, 콜백). 과방 지도의 건물 그림: 마우스를 올리면 커지고 눌렀다 떼면 입장 |
+| `hud.py` | `HudSkin` | 상단 HUD(목숨, 체력 10칸, 슬롯, 키 4칸, 낮 타이머, 전체 지도). 디자인 그림 `assets/ui/hud_design.png`을 틀로 쓰고 값만 그림 (그림 없으면 기본 HUD). ESC 일시정지·졸업 메뉴도 같은 알약 틀(`panel`, `pill`) 사용 |
 
 ### OOP 포인트
 - **상속**: `Entity` → `Player`/`Monster` → `Boss`, `Zone` → `FinalZone`, `Weapon` → `Spear`/`Bow`, `Pickup` → 2종, `Scene` → `MenuScene` → `PauseScene`/`GraduationScene`
@@ -50,18 +57,34 @@ python main.py
 - **추상 클래스**: `Weapon`, `Pickup`은 `ABC` + `@abstractmethod`
 - **캡슐화**: 인벤토리 조작은 `Inventory` 메서드로만 (`add_weapon`, `add_key`, `has_key_for`, `select_slot`)
 
-## 건물 맵 직접 디자인하기
+## 건물 미로 (현재: 4곳 모두 "건물 + 앞마당" 랜덤 미로)
+- 크기 25 x 17칸 = **한 화면** (스크롤 없음). `COURTYARD_COLS/ROWS`를 화면보다 크게 하면 카메라가 따라가도록 코드는 남겨 둠 (`ZoneScene.update_camera`)
+- 위쪽 4줄(`settings.BUILDING_BAND_ROWS`)에 그 건물 그림, 아래는 담장 두른 돌바닥 마당
+- 미로: `Maze.courtyard()` — 2칸 간격 기둥 사이에 벽 조각을 랜덤으로 세움 (통로 1칸).
+  **Union-Find**로 "이미 벽으로 이어진 두 기둥 사이엔 벽을 안 세움" → 벽이 고리를 못 만들어서 갇힌 곳이 절대 안 생김 (미로 하나 약 10ms).
+  4번 만들어 보고 입구(아래 가운데) → 탈출구(건물 바로 앞) 경로가 가장 긴 것을 고름 (한 화면 기준 약 30걸음). 새 게임마다 바뀜
+- 조절 (`settings.py`): 크기 `COURTYARD_COLS/ROWS`, 통로 폭 `COURTYARD_STEP` (2 = 1칸 복잡 / 3 = 2칸 널찍), 벽 비율 `COURTYARD_WALL_DENSITY`, 적용 건물 `COURTYARD_ZONES`
+- 그림 (`themes.py`, 건물별 등록은 `ZONE_THEMES`)
+  - 4개 건물 모두 `ZoneTileTheme` (`CourtyardTheme` 상속) — 위쪽 건물 띠는 참고 그림 `tiles/campus_mazes.png`에서,
+    마당은 64px 타일 세트 `assets/tiles/zones/` (library / student_hall / pond / dorm, 목록은 `manifest.json`)
+    - 바닥은 `floor_main` 한 장으로 통일. 새 세트를 받으면 같은 구조로 `zones/` 폴더만 바꾸면 됨
+    - 벽 칸: 아래가 길 → 벽 앞면 (기본 벽 `main_wall` 위주, 특수 벽·문 비율은 구역별: 기숙사 방문 70%, 명수당 이끼·연꽃 벽 45%) / 아래도 벽 → 기본 벽을 어둡게 (벽 윗부분)
+    - 양옆이 벽인 앞면 중 일부는 **문**(`doors`)으로 표시. 지금은 그림만 문이고 충돌은 벽 그대로 (방에 들어가는 기능은 아직 없음)
+    - **장식**(`decor`, 바닥 포함 한 칸 타일)은 **막다른 길**에 놓고, 그 칸은 못 지나감 (`Zone.place_decor`, 개수 `settings.DECOR_PER_ZONE`).
+      막다른 길만 막아서 다른 길은 절대 끊기지 않음
+
+## 건물 맵 직접 디자인하기 (선택)
+- `COURTYARD_ZONES`에서 뺀 건물은 맵 파일을 씀. 맵 파일도 없으면 기본 랜덤 미로
 - 맵 파일: `assets/maps/건물.txt` (가로 25 x 세로 17 글자), 등록: `settings.ZONE_MAP_FILES`
 - 기호: `#` 벽, `.` 길, `H` 입구(과방 쪽 모서리), `E` 탈출구, `P` 화분, `T` 책상, `L` 조명 (장식은 못 지나감)
 - 규칙: 바깥 테두리는 전부 벽 / 모든 길이 이어져 있어야 함
-- 그림(테마): `themes.py`에서 아트 이미지의 어느 부분을 바닥·책장·장식으로 쓸지 좌표로 지정 → `ZONE_THEMES`에 등록
-- 맵 파일이 없는 건물은 랜덤 미로 + 단색 그림
-- 테마 종류 (`themes.py`)
-  - `ArtTheme`: 그림에서 바닥·벽 조각을 잘라 타일로 깔기 → 1. 도서관 (`maps/library.txt` + `tiles/library_art.png`)
+- 맵 파일이 없는 건물은 **랜덤 미로** (새 게임마다 바뀜)
+- 다른 테마 (`themes.py`, 건물별 등록은 `ZONE_THEMES`. 지금은 안 쓰지만 `ZONE_THEMES`만 바꾸면 되돌릴 수 있음)
+  - `TileTheme`: 벽·바닥 타일(64px PNG) 여러 장을 칸마다 섞어 깔기. 랜덤 미로에 사용
+  - `CourtyardTheme`: 참고 그림 `tiles/campus_mazes.png`에서 바닥·벽 조각을 잘라 씀 (`LIBRARY_COURTYARD` 등, 예전 1·3번 그림)
   - `ImageTheme`: 미로 그림 한 장을 그대로 배경으로 (800x544로 줄여 저장), 벽/길은 맵 파일이 판정
-    → 2. 학생회관 (`maps/student_hall.txt` + `tiles/student_hall_maze.png`)
-    → 3. 명수당 (`maps/myeongsudang.txt` + `tiles/myeongsudang_maze.png`)
-    → 4. 기숙사 (`maps/dormitory.txt` + `tiles/dormitory_maze.png`, 학생회관과 같은 배치라 맵 공유)
+    → 2. 기숙사 (`maps/dormitory.txt` + `tiles/dormitory_maze.png`, 학생회관과 같은 배치라 맵 공유)
+    → 4. 학생회관 (`maps/student_hall.txt` + `tiles/student_hall_maze.png`)
   - 그림 미로의 맵 파일은 색으로 자동 판정 후 START→GOAL 연결을 확인해 만든 것. 그림과 반 칸 정도 어긋나는 곳은 맵 파일을 직접 고치면 됨
 - 과방 지도의 건물 그림: `assets/buildings/건물.png` (배경 투명 PNG) → `settings.ZONE_BUILDING_IMAGES`, 가운데 과방 문은 `settings.CENTER_IMAGE`
 
@@ -85,8 +108,9 @@ python main.py
 | 장소 | 괴물 |
 |---|---|
 | 중앙: 과방(교양관) | – (안전지대) |
-| 1. 도서관 | 책귀 (`monsters/book.png`) |
-| 2. 학생회관 | BOO (`monsters/boo.png`) |
-| 3. 명수당 | 물귀신 (`monsters/ghost.png`) |
-| 4. 기숙사 | 경비아저씨 (`monsters/guard.png`) |
+| (괴물 그림) | 방향별 4장 `monsters/이름_down/up/left/right.png`. 움직이는(공격하는) 방향을 바라봄 (`Monster.face`, `sprite_path`) |
+| 1. 도서관 | 책귀 (`monsters/book_*.png`) |
+| 2. 학생회관 | BOO (`monsters/boo_*.png`) |
+| 3. 명수당 | 물귀신 (`monsters/ghost_*.png`) |
+| 4. 기숙사 | 경비아저씨 (`monsters/guard_*.png`) |
 | 최종: 교수연구동 | 최종 보스 (`settings.BOSS_NAME`) |

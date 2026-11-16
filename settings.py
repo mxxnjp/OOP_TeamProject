@@ -3,10 +3,12 @@
 
 # ---------------- 화면 ----------------
 TILE = 32                      # 타일 한 칸 크기(px)
-MAZE_COLS, MAZE_ROWS = 25, 17  # 미로 크기(홀수여야 미로 생성이 깔끔함)
+VIEW_COLS, VIEW_ROWS = 25, 17  # 화면에 한 번에 보이는 칸 수
+MAZE_COLS, MAZE_ROWS = 25, 17  # 기본 랜덤 미로·맵 파일 크기 (최종 스테이지 등. 홀수여야 깔끔함)
 HUD_HEIGHT = 96                # 상단 HUD(체력/인벤토리/전체지도) 높이
-SCREEN_W = TILE * MAZE_COLS                # 800
-SCREEN_H = HUD_HEIGHT + TILE * MAZE_ROWS   # 640
+SCREEN_W = TILE * VIEW_COLS                # 800
+SCREEN_H = HUD_HEIGHT + TILE * VIEW_ROWS   # 640
+# 미로가 화면보다 크면 카메라가 플레이어를 따라 움직인다
 FPS = 60
 TITLE = "HUFS RUN: 졸업 좀 시켜주세요"
 FONT_NAMES = "malgungothic,applegothic,nanumgothic"  # 한글 폰트 후보
@@ -18,13 +20,33 @@ ZONE_LAYOUT = {1: (0, 0), 2: (1, 0), 3: (0, 1), 4: (1, 1)}
 FINAL_ZONE_ID = 5               # 최종 스테이지(구역 4개 키를 다 모으면 열림)
 # True면 밤마다 미로 재생성. 단, 재생성하면 바닥 무기가 사라져서 "무기 누적"이 안 됨
 MAZE_CHANGES_EACH_NIGHT = False
-# 직접 디자인한 맵 파일(assets/ 기준). 없는 건물은 랜덤 미로를 쓴다.
+# "건물 + 앞마당" 랜덤 미로를 쓰는 구역 (새 게임마다 미로가 바뀜)
+#   위쪽 BUILDING_BAND_ROWS 줄에는 그 건물 그림, 아래는 담장 두른 마당 + ㄱ·ㄴ·T자 벽 조각
+COURTYARD_ZONES = (1, 2, 3, 4)
+COURTYARD_COLS = 25              # 앞마당 미로 가로 칸 수 (홀수). 화면(25칸)과 같으면 스크롤 없이 한 화면
+COURTYARD_ROWS = 17              # 세로 칸 수 (COURTYARD_ROWS - BUILDING_BAND_ROWS 가 홀수여야 함)
+BUILDING_BAND_ROWS = 4           # 건물 그림이 차지하는 줄 수 (4줄 = 128px)
+COURTYARD_STEP = 2               # 벽 격자 간격. 2 = 통로 1칸(복잡), 3 = 통로 2칸(널찍)
+COURTYARD_WALL_DENSITY = 0.5     # 마당 안쪽에서 벽이 차지하는 최대 비율 (클수록 복잡)
+DECOR_PER_ZONE = 14              # 타일 세트에 장식이 있는 건물: 막다른 길에 놓을 장식 수 (못 지나감)
+# 직접 디자인한 맵 파일(assets/ 기준). COURTYARD_ZONES에서 빼면 이 맵을 쓴다. 둘 다 없으면 기본 랜덤 미로.
 #   맵 기호: # 벽   . 길   H 입구   E 탈출구   P 화분  T 책상  L 조명 (장식은 지나갈 수 없음)
-ZONE_MAP_FILES = {1: "maps/library.txt", 2: "maps/student_hall.txt",
-                  3: "maps/myeongsudang.txt", 4: "maps/dormitory.txt"}
+ZONE_MAP_FILES = {}              # 예: {2: "maps/dormitory.txt"} (지금은 모든 건물이 랜덤 앞마당 미로)
 # 과방(중앙) 지도에서 미로 미리보기 대신 보여줄 건물 그림(assets/ 기준). 없는 건물은 미로 미리보기
 ZONE_BUILDING_IMAGES = {1: "buildings/library.png", 2: "buildings/student_hall.png",
                         3: "buildings/myeongsudang.png", 4: "buildings/dormitory.png"}
+# 과방 지도 디자인 그림(assets/ui/center_design.png)에서 각 건물을 잘라 올 영역 (x, y, w, h, 원본 그림 기준).
+#   건물은 그림 속 위치 그대로 화면에 놓임. 디자인 그림이 없으면 위 ZONE_BUILDING_IMAGES를 씀
+CENTER_MAP_CROPS = {1: (120, 262, 640, 205),    # 도서관 (왼쪽 위)
+                    2: (915, 257, 640, 208),    # 학생회관 (오른쪽 위)
+                    3: (85, 640, 620, 268),     # 명수당 (왼쪽 아래)
+                    4: (1000, 632, 630, 266)}   # 기숙사 (오른쪽 아래)
+# 과방 지도 색감: 메인 디자인 그림(center_design.png)의 색 분포(채널별 평균, 표준편차)에 그림들을 맞춤
+#   배경(밤하늘·숲)은 아래 값으로, 건물·과방은 디자인 그림 속 같은 건물 부분(CENTER_MAP_CROPS)에서 자동으로 잼
+CENTER_TONE_BG = ((48, 50, 65), (24, 20, 22))
+CENTER_ROOM_IMAGE = "buildings/center_room.png"    # 지도 가운데 과방 그림
+CENTER_LABEL = "AI데이터융합학부 과방"             # 과방 그림 위 이름표
+MAIN_BACKGROUND = "ui/main_background.png"   # 과방 지도 화면 전체 + HUD 뒤에 깔리는 배경 그림
 CENTER_IMAGE = "buildings/center_door.png"   # 지도 가운데 과방 그림 (없으면 파란 원)
 
 # ---------------- 테마(이름) : 여기만 바꾸면 게임 안 글자가 다 바뀜 ----------------
@@ -32,9 +54,21 @@ CENTER_NAME = "과방 (교양관)"
 ZONE_NAMES = {1: "도서관", 2: "학생회관", 3: "명수당", 4: "기숙사"}
 MONSTER_NAMES = {1: "책귀", 2: "BOO", 3: "물귀신", 4: "경비아저씨"}
 # 괴물 그림(assets/ 기준, 배경 투명 PNG). 없으면 사각형으로 그림
-MONSTER_SPRITES = {1: "monsters/book.png", 2: "monsters/boo.png",
-                   3: "monsters/ghost.png", 4: "monsters/guard.png"}
+#   방향별 그림(앞/뒤/옆): {"down": 앞모습, "up": 뒷모습, "left": 왼쪽, "right": 오른쪽}. 그림 한 장(문자열)도 가능
+def _four_ways(name, folder="monsters"):
+    return {d: f"{folder}/{name}_{d}.png" for d in ("down", "up", "left", "right")}
+
+
+MONSTER_SPRITES = {1: _four_ways("book"), 2: _four_ways("boo"),
+                   3: _four_ways("ghost"), 4: _four_ways("guard")}
 MONSTER_SPRITE_SIZE = 44   # 괴물 그림이 들어갈 최대 크기(px). 타일(32)보다 조금 크게
+
+# 플레이어 캐릭터 (시작할 때 선택). 그림: assets/player/boy_down.png 처럼 방향별 4장
+PLAYER_CHARACTERS = {
+    "boy": {"name": "남학생", "sprites": _four_ways("boy", "player"), "color": (70, 130, 230)},
+    "girl": {"name": "여학생", "sprites": _four_ways("girl", "player"), "color": (230, 120, 170)},
+}
+PLAYER_SPRITE_SIZE = 44
 
 # 무기·물약 그림(assets/ 기준). 없으면 도형으로 그림
 ITEM_SPRITES = {"spear": "items/spear.png", "bow": "items/bow.png",

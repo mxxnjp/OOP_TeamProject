@@ -6,7 +6,9 @@ from collections import deque
 from settings import (MAZE_COLS, MAZE_ROWS, TILE, ZONE_COUNT, ZONE_LAYOUT, FINAL_ZONE_ID,
                       MAZE_CHANGES_EACH_NIGHT, MONSTER_SPAWN_AWAY_FROM_PLAYER, ZONE_MAP_FILES,
                       ZONE_NAMES, MONSTER_NAMES, MONSTER_SPRITES, FINAL_ZONE_NAME, BOSS_NAME,
-                      DAY_LOOT, MAX_PICKUPS_PER_ZONE, FINAL_STAGE_POTIONS)
+                      DAY_LOOT, MAX_PICKUPS_PER_ZONE, FINAL_STAGE_POTIONS,
+                      COURTYARD_ZONES, BUILDING_BAND_ROWS, COURTYARD_WALL_DENSITY,
+                      COURTYARD_COLS, COURTYARD_ROWS, COURTYARD_STEP, DECOR_PER_ZONE)
 from items import WeaponPickup, PotionPickup, Spear, Bow
 from entities import Monster, Boss, DIRECTIONS
 from themes import ASSET_DIR, DECOR_SYMBOLS, DEFAULT_THEME, ZONE_THEMES
@@ -52,8 +54,8 @@ class Maze:
                     if ch in "HE":
                         markers[ch] = (x, y)
             grid.append(row)
-        if len(grid) != MAZE_ROWS or any(len(r) != MAZE_COLS for r in grid):
-            raise ValueError(f"{path}: 맵은 가로 {MAZE_COLS} x 세로 {MAZE_ROWS} 칸이어야 합니다.")
+        if not grid or any(len(r) != len(grid[0]) for r in grid):
+            raise ValueError(f"{path}: 맵의 모든 줄은 길이가 같아야 합니다.")
         return cls(grid), markers, decor
 
     def _carve(self, rng):
@@ -110,6 +112,82 @@ class Maze:
             return None, float("inf")
         return parents[start], dist[start]
 
+    @classmethod
+    def courtyard(cls, cols, rows, rng, band_rows, density, step=3, tries=4):
+        """'건물 앞마당' 미로. 위쪽 band_rows 줄은 건물 그림 자리(벽으로 막음),
+        그 아래는 담장으로 둘러싼 마당에 ㄱ·ㄴ·T자 벽 조각을 랜덤으로 세운다.
+
+        - 벽은 step칸 간격 격자점(기둥) 사이에만 세운다. step=2면 통로 1칸(복잡), 3이면 2칸(널찍).
+        - 길이 끊기지 않게 하는 방법 (Union-Find): 벽들이 고리(닫힌 원)를 만들면 그 안이 갇힌다.
+          그래서 "이미 벽으로 이어진 두 기둥 사이"에는 벽을 세우지 않는다. 담장 전체는 한 덩어리로 친다.
+          → 길 찾기 없이도 모든 길이 항상 이어져 있다 (그래서 큰 미로도 빠르게 만들어짐).
+        - 여러 번 만들어 보고 입구 → 탈출구 경로가 가장 긴 것을 고른다.
+        반환: (미로, {"H": 입구, "E": 탈출구})
+        """
+        top, bottom = band_rows + 1, rows - 2               # 마당 안쪽 첫 줄 / 마지막 줄
+        entrance, exit_ = (cols // 2, bottom), (cols // 2, top)
+        keep = {(entrance[0] + d, entrance[1]) for d in (-1, 0, 1)} | \
+               {(exit_[0] + d, exit_[1]) for d in (-1, 0, 1)}
+        xs = list(range(step, cols - 1, step))              # 격자점 x
+        ys = list(range(top + step - 1, bottom, step))      # 격자점 y
+
+        BORDER = "border"                                   # 담장 전체 = 기둥 하나로 취급
+
+        def segments():
+            """(칸 목록, 한쪽 기둥, 다른쪽 기둥) 목록. 담장에 붙는 조각은 한쪽이 BORDER."""
+            segs = []
+            for y in ys:
+                row = [0] + xs + [cols - 1]
+                for a, b in zip(row, row[1:]):
+                    na = BORDER if a == 0 else (a, y)
+                    nb = BORDER if b == cols - 1 else (b, y)
+                    segs.append(([(x, y) for x in range(a, b + 1) if 0 < x < cols - 1], na, nb))
+            for x in xs:
+                col = [band_rows] + ys + [rows - 1]
+                for a, b in zip(col, col[1:]):
+                    na = BORDER if a == band_rows else (x, a)
+                    nb = BORDER if b == rows - 1 else (x, b)
+                    segs.append(([(x, y) for y in range(a, b + 1) if top <= y <= bottom], na, nb))
+            return segs
+
+        best, best_len = None, -1
+        for _ in range(tries):
+            grid = [[1] * cols for _ in range(rows)]
+            for y in range(top, bottom + 1):
+                for x in range(1, cols - 1):
+                    grid[y][x] = 0
+            parent = {}
+
+            def find(node):                                 # Union-Find: 같은 벽 덩어리인지
+                parent.setdefault(node, node)
+                while parent[node] != node:
+                    parent[node] = parent[parent[node]]
+                    node = parent[node]
+                return node
+
+            inner = (bottom - top + 1) * (cols - 2)
+            walls = 0
+            segs = segments()
+            rng.shuffle(segs)
+            for cells, na, nb in segs:
+                if walls >= inner * density:
+                    break
+                if any(c in keep for c in cells):
+                    continue
+                ra, rb = find(na), find(nb)
+                if ra == rb:                                # 이미 이어진 벽끼리 -> 고리가 생겨서 갇힘
+                    continue
+                parent[ra] = rb
+                for x, y in cells:
+                    if grid[y][x] == 0:
+                        grid[y][x] = 1
+                        walls += 1
+            maze = cls(grid)
+            length = maze.distances_from(entrance).get(exit_, -1)
+            if length > best_len:
+                best, best_len = maze, length
+        return best, {"H": entrance, "E": exit_}
+
 
 class Zone:
     """건물(서브 미로) 하나. 미로, 입구(중앙 연결), 탈출구, 아이템, 괴물을 가진다.
@@ -129,13 +207,19 @@ class Zone:
     def pick_entrance(self):
         """입구는 중앙(과방)을 향한 모서리."""
         lx, ly = ZONE_LAYOUT[self.id]
-        return (MAZE_COLS - 2 if lx == 0 else 1, MAZE_ROWS - 2 if ly == 0 else 1)
+        cols, rows = self.maze.cols, self.maze.rows
+        return (cols - 2 if lx == 0 else 1, rows - 2 if ly == 0 else 1)
 
     def build_maze(self, seed):
         self.rng = random.Random(seed)
         self.theme = ZONE_THEMES.get(self.id, DEFAULT_THEME)
         map_file = ZONE_MAP_FILES.get(self.id)
-        if map_file:      # 직접 디자인한 맵
+        if self.id in COURTYARD_ZONES:   # 건물 + 앞마당 랜덤 미로
+            self.maze, markers = Maze.courtyard(COURTYARD_COLS, COURTYARD_ROWS, self.rng,
+                                                BUILDING_BAND_ROWS, COURTYARD_WALL_DENSITY,
+                                                step=COURTYARD_STEP)
+            self.decor = self.place_decor(markers)
+        elif map_file:    # 직접 디자인한 맵
             self.maze, markers, self.decor = Maze.from_file(os.path.join(ASSET_DIR, map_file))
         else:             # 랜덤 미로
             self.maze, markers, self.decor = Maze.generate(MAZE_COLS, MAZE_ROWS, self.rng), {}, {}
@@ -147,6 +231,30 @@ class Zone:
         self.monsters.clear()
         self.projectiles.clear()
         self._surface_cache = {}
+
+    def place_decor(self, markers):
+        """테마에 장식 그림이 있으면 막다른 길 칸에 놓는다. 장식 칸은 벽처럼 못 지나간다.
+        막다른 길(이웃 길이 1칸뿐)은 막아도 다른 길이 끊기지 않아서 안전하다."""
+        names = self.theme.decor_names
+        if not names:
+            return {}
+        maze = self.maze
+        avoid = set()
+        for x, y in markers.values():                     # 입구·탈출구 근처는 비워 둠
+            avoid |= {(x + dx, y + dy) for dx in range(-2, 3) for dy in range(-2, 3)}
+
+        def floor_neighbors(x, y):
+            return sum(not maze.is_wall(x + dx, y + dy) for dx, dy in DIRECTIONS)
+
+        dead_ends = [(x, y) for y in range(maze.rows) for x in range(maze.cols)
+                     if not maze.is_wall(x, y) and (x, y) not in avoid and floor_neighbors(x, y) == 1]
+        self.rng.shuffle(dead_ends)
+        decor = {}
+        for x, y in dead_ends[:DECOR_PER_ZONE]:
+            if floor_neighbors(x, y) == 1:                # 앞에서 놓은 장식 때문에 바뀌었을 수 있음
+                maze.grid[y][x] = 1
+                decor[(x, y)] = self.rng.choice(names)
+        return decor
 
     def surface(self, scale=TILE):
         if scale not in self._surface_cache:
@@ -170,7 +278,8 @@ class Zone:
         return self.rng.choice(tiles)
 
     def spawn_day_items(self):
-        """낮마다 아이템을 '추가'한다(안 주운 것은 그대로 남아 누적). 최대 개수 제한 있음."""
+        """낮마다 아이템을 '추가'한다(안 주운 것은 그대로 남아 누적). 최대 개수 제한 있음.
+        아이템은 낮이 시작될 때만 생기고, 밤에는 새로 생기지 않는다."""
         for kind, count in DAY_LOOT.items():
             for _ in range(count):
                 if len(self.pickups) >= MAX_PICKUPS_PER_ZONE:
@@ -205,7 +314,13 @@ class Zone:
         for m in dead:
             game.on_monster_killed(self, m)
 
+    def items_available(self, game):
+        """아이템을 보고 주울 수 있는 때: 낮, 또는 최종 스테이지(보스전용 물약)."""
+        return not game.is_night or self.is_final
+
     def collect_pickups(self, player, game):
+        if not self.items_available(game):      # 밤에는 아이템을 주울 수 없음 (다음 낮까지 그대로 남음)
+            return
         for p in list(self.pickups):
             if (p.x, p.y) == (player.x, player.y):
                 msg = p.apply(player)
@@ -225,7 +340,7 @@ class FinalZone(Zone):
         self.monster_name = BOSS_NAME
 
     def pick_entrance(self):
-        return (1, MAZE_ROWS - 2)
+        return (1, self.maze.rows - 2)
 
     def build_maze(self, seed):
         super().build_maze(seed)

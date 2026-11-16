@@ -11,7 +11,7 @@ from settings import (TILE, HUD_HEIGHT, PLAYER_MAX_HP, PLAYER_LIVES, PLAYER_MOVE
                       BOSS_MELEE_COOLDOWN, BOSS_RANGED_DAMAGE, BOSS_RANGED_COOLDOWN,
                       BOSS_RANGED_RANGE,
                       BLUE, WHITE, RED, GREEN, MONSTER_COLOR, BOSS_COLOR, DARK_RED)
-from settings import MONSTER_SPRITE_SIZE
+from settings import MONSTER_SPRITE_SIZE, PLAYER_CHARACTERS, PLAYER_SPRITE_SIZE
 from items import Inventory
 from projectiles import PoisonDart
 from themes import load_sprite
@@ -20,13 +20,32 @@ DIRECTIONS = ((1, 0), (-1, 0), (0, 1), (0, -1))
 
 
 class Entity:
-    """타일 좌표(x, y)와 체력을 가진 모든 캐릭터의 부모 클래스."""
+    """타일 좌표(x, y)와 체력을 가진 모든 캐릭터의 부모 클래스.
+    바라보는 방향(facing)과 방향별 그림 고르기도 여기서 공통으로 처리한다 (Player, Monster 둘 다 사용)."""
+    FACING_NAMES = {(0, 1): "down", (0, -1): "up", (-1, 0): "left", (1, 0): "right"}
 
     def __init__(self, x, y, max_hp):
         self.x, self.y = x, y
         self.max_hp = max_hp
         self.hp = max_hp
         self.hurt_timer = 0.0   # 맞았을 때 깜빡임 효과
+        self.facing = (0, 1)    # 바라보는 방향 (처음엔 앞모습)
+        self.sprite = None      # 그림 경로, 또는 방향별 그림 {"down","up","left","right"}
+
+    def face(self, dx, dy):
+        """(dx, dy) 쪽을 바라보게. 대각선이면 더 큰 축 기준."""
+        if dx == 0 and dy == 0:
+            return
+        if abs(dx) >= abs(dy):
+            self.facing = (1 if dx > 0 else -1, 0)
+        else:
+            self.facing = (0, 1 if dy > 0 else -1)
+
+    def sprite_path(self):
+        """지금 방향에 맞는 그림 경로. 방향별 그림이 없으면 그림 한 장 그대로."""
+        if isinstance(self.sprite, dict):
+            return self.sprite.get(self.FACING_NAMES[self.facing]) or self.sprite.get("down")
+        return self.sprite
 
     @property
     def alive(self):
@@ -61,12 +80,19 @@ class Entity:
 
 
 class Player(Entity):
-    def __init__(self):
+    def __init__(self, character="boy"):
         super().__init__(0, 0, PLAYER_MAX_HP)
         self.lives = PLAYER_LIVES
         self.inventory = Inventory()
-        self.facing = (0, 1)
         self.move_timer = 0.0
+        self.set_character(character)
+
+    def set_character(self, key):
+        """선택한 캐릭터(남/여)의 이름·그림·대체 색을 적용."""
+        info = PLAYER_CHARACTERS[key]
+        self.character = key
+        self.sprite = info["sprites"]
+        self.color = info["color"]
 
     def respawn(self):
         self.hp = self.max_hp
@@ -107,10 +133,15 @@ class Player(Entity):
 
     def draw(self, surf):
         cx, cy = self.screen_center()
-        color = WHITE if self.hurt_timer > 0 else BLUE
-        pygame.draw.circle(surf, color, (cx, cy), TILE // 2 - 4)
-        fx, fy = self.facing
-        pygame.draw.circle(surf, WHITE, (cx + fx * 7, cy + fy * 7), 3)
+        path = self.sprite_path()
+        image = load_sprite(path, PLAYER_SPRITE_SIZE, flash=self.hurt_timer > 0) if path else None
+        if image:                                   # 바라보는 방향의 캐릭터 그림 (발을 타일 바닥에)
+            surf.blit(image, image.get_rect(midbottom=(cx, cy + TILE / 2)))
+        else:                                       # 그림이 없으면 동그라미 + 방향 점
+            color = WHITE if self.hurt_timer > 0 else self.color
+            pygame.draw.circle(surf, color, (cx, cy), TILE // 2 - 4)
+            fx, fy = self.facing
+            pygame.draw.circle(surf, WHITE, (cx + fx * 7, cy + fy * 7), 3)
         weapon = self.inventory.current_weapon
         if weapon:
             weapon.draw_effect(surf, self)
@@ -134,7 +165,7 @@ class Monster(Entity):
         super().__init__(x, y, self.max_hp)
         self.rng = rng
         self.name = name
-        self.sprite = sprite   # 그림 파일 경로 (assets/ 기준). None이면 사각형
+        self.sprite = sprite   # 없으면(None) 사각형으로 그림
         self.move_timer = rng.uniform(0, self.move_delay)
         self.melee_timer = 0.0
         self.ranged_timer = self.ranged_cooldown
@@ -149,6 +180,7 @@ class Monster(Entity):
 
         # 1) 바로 옆이면 근접 공격 (쿨타임 있음)
         if distance == 1:
+            self.face(player.x - self.x, player.y - self.y)          # 공격할 땐 플레이어 쪽을 봄
             if self.melee_timer <= 0:
                 player.take_damage(self.melee_damage)
                 self.melee_timer = self.melee_cooldown
@@ -158,14 +190,16 @@ class Monster(Entity):
         if self.ranged_timer <= 0 and self._has_line_of_sight(player, zone):
             mx, my = self.world_center()
             px, py = player.world_center()
+            self.face(player.x - self.x, player.y - self.y)
             zone.projectiles.append(PoisonDart(mx, my, px - mx, py - my, self.ranged_damage))
             self.ranged_timer = self.ranged_cooldown
 
-        # 3) 이동
+        # 3) 이동: 움직이는 방향을 바라봄
         if self.move_timer <= 0:
             self.move_timer = self.move_delay
             step = self.choose_step(zone, player)
             if step and step != (player.x, player.y) and not zone.monster_at(*step):
+                self.face(step[0] - self.x, step[1] - self.y)
                 self.x, self.y = step
 
     def choose_step(self, zone, player):
@@ -203,7 +237,8 @@ class Monster(Entity):
     def draw(self, surf, font=None):
         cx, cy = self.screen_center()
         top = cy - TILE / 2
-        image = load_sprite(self.sprite, MONSTER_SPRITE_SIZE, flash=self.hurt_timer > 0) if self.sprite else None
+        path = self.sprite_path()
+        image = load_sprite(path, MONSTER_SPRITE_SIZE, flash=self.hurt_timer > 0) if path else None
         if image:
             # 발이 타일 바닥에 닿게 (키 큰 그림은 위로 삐져나옴)
             rect = image.get_rect(midbottom=(cx, cy + TILE / 2))

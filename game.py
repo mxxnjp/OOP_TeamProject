@@ -13,7 +13,7 @@ from world import World
 from entities import Player, Boss
 from items import Key
 from scenes import (CenterScene, ZoneScene, TransitionScene, EndScene, PauseScene,
-                    GraduationScene)
+                    GraduationScene, CharacterSelectScene)
 
 
 class Game:
@@ -43,10 +43,15 @@ class Game:
         self.message = ""
         self.message_timer = 0.0
         self.world.start_day()
-        self.scene = TransitionScene(
+        self.scene = CharacterSelectScene(self, on_choose=self.choose_character)   # 먼저 캐릭터 선택
+
+    def choose_character(self, key):
+        """캐릭터를 고르면 시작 안내 화면으로."""
+        self.player.set_character(key)
+        self.change_scene(TransitionScene(
             self, [TITLE, f"{CENTER_NAME}에서 눈을 떴다...",
                    f"낮({self.day_timer}초) 동안 건물을 돌며 무기를 모으자"],
-            on_finish=self.return_to_center)
+            on_finish=self.return_to_center))
 
     def change_scene(self, scene):
         self.scene = scene
