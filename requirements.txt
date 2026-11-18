@@ -1,0 +1,7 @@
+# HUFS RUN 실행에 필요한 패키지 (Python 3.13에서 확인)
+# 설치: pip install -r requirements.txt
+#
+# 주의: 코드는 `import pygame`이지만 설치하는 패키지는 pygame-ce(커뮤니티 판)입니다.
+#       원래 pygame이 깔려 있으면 충돌하니 먼저 지우세요: pip uninstall pygame
+pygame-ce>=2.5.8,<3
+numpy>=1.26

@@ -1,0 +1,24 @@
+# 파이썬이 실행할 때 자동으로 만드는 파일
+__pycache__/
+*.py[cod]
+
+# 가상환경
+.venv/
+venv/
+env/
+
+# 실행 파일 만들기(PyInstaller) 결과물
+build/
+dist/
+*.spec
+
+# 편집기 / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 게임이 실행 중에 만드는 파일 (저장·로그 기능을 넣으면 여기에)
+*.log
+saves/

@@ -1,5 +1,13 @@
 # HUFS RUN: 졸업 좀 시켜주세요 (pygame OOP 프로젝트)
 
+처음 한 번만 설치 (Python 3.13 기준. 원래 pygame이 깔려 있으면 먼저 `pip uninstall pygame`):
+
+```bash
+pip install -r requirements.txt
+```
+
+실행:
+
 ```bash
 python main.py
 ```
