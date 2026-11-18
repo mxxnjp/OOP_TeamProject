@@ -162,6 +162,7 @@ class CourtyardTheme(Theme):
     BORDER_DARK = 90        # 참고 그림 조각 테두리(검은 틀) 판정: 한 줄 평균 밝기(R+G+B)가 이보다 어두우면 틀
     EDGE_SAMPLE = 0.04           # 양옆 빈 곳 색을 가져올 그림 가장자리 폭 (그림 폭 대비)
     EDGE_FADE = 40               # 건물 그림과 양옆 배경을 부드럽게 섞는 폭(px, 화면 기준)
+    COVER_IF_GAP = 0.15          # 양옆 빈 곳이 띠 폭의 이 비율보다 작으면 채우지 않고 그림을 키워 꽉 채움
 
     def _trimmed_band(self):
         """band 영역에서 바깥 검은 틀(테두리)을 잘라낸 영역. 한 번 계산해 둠."""
@@ -185,6 +186,15 @@ class CourtyardTheme(Theme):
         area = pygame.Rect(0, 0, maze.cols * scale, self.band_rows * scale)
         src = self._trimmed_band()                                       # 검은 틀 뺀 건물 그림
         k = min(area.width / src.width, area.height / src.height)
+        if src.width * k >= area.width * (1 - self.COVER_IF_GAP):
+            # 그림이 거의 띠 폭만 하면(명수당·학생회관) 양옆을 채우지 말고 그림을 살짝 키워 폭을 꽉 채움.
+            # 좁은 틈을 늘린 색으로 채우면 가로 줄무늬가 생겨서. 넘치는 위쪽(하늘)만 조금 잘림
+            k = max(area.width / src.width, area.height / src.height)
+            img = self._crop(src, round(src.width * k), round(src.height * k))
+            surf.set_clip(area)                                          # 띠 밖으로 넘치는 부분은 안 그림
+            surf.blit(img, img.get_rect(midbottom=area.midbottom))
+            surf.set_clip(None)
+            return
         img = self._crop(src, round(src.width * k), round(src.height * k)).convert_alpha()
         rect = img.get_rect(midbottom=area.midbottom)
         # 1) 양옆 빈 곳: 건물 그림 가장자리(폭의 EDGE_SAMPLE) 배경색을 줄마다 뽑아(중앙값: 가로등 같은 밝은 점 무시)

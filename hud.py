@@ -4,7 +4,7 @@ import pygame
 from themes import load_sprite, load_image
 
 from settings import (SCREEN_W, SCREEN_H, HUD_HEIGHT, ZONE_LAYOUT, PLAYER_MAX_HP, FINAL_ZONE_ID, FONT_NAMES,
-                      ZONE_NAMES, BOSS_NAME, ITEM_SPRITES, MAIN_BACKGROUND, CENTER_TONE_BG,
+                      ZONE_NAMES, BOSS_NAME, ITEM_SPRITES, MAIN_BACKGROUND, CENTER_TONE_BG, CENTER_NIGHT_SHADE,
                       HUD_BG, WHITE, GRAY, RED, DARK_RED, GREEN, GOLD, YELLOW,
                       HOME_COLOR, PURPLE)
 
@@ -114,6 +114,10 @@ class HudSkin:
         bg = screen_background()                       # HUD 뒤에도 메인 배경 그림 (없으면 검정)
         if bg:
             surf.blit(bg, (0, 0), (0, 0, SCREEN_W, HUD_HEIGHT))
+            if game.is_night:                          # 밤: 지도 화면과 같이 배경만 조금 어둡게
+                shade = pygame.Surface((SCREEN_W, HUD_HEIGHT), pygame.SRCALPHA)
+                shade.fill(CENTER_NIGHT_SHADE)
+                surf.blit(shade, (0, 0))
         else:
             surf.fill((0, 0, 0), (0, 0, SCREEN_W, HUD_HEIGHT))
         surf.blit(self.base, (0, 0))

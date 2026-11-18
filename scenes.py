@@ -3,7 +3,7 @@ import pygame
 
 from settings import (SCREEN_W, SCREEN_H, HUD_HEIGHT, TILE, ZONE_LAYOUT, VIEW_COLS, VIEW_ROWS,
                       TRANSITION_TIME, NIGHT_VISION_RADIUS, CENTER_REGEN_PER_SEC,
-                      ZONE_BUILDING_IMAGES, CENTER_IMAGE, CENTER_MAP_CROPS,
+                      ZONE_BUILDING_IMAGES, CENTER_IMAGE, CENTER_MAP_CROPS, CENTER_BUILDING_ADJUST, CENTER_NIGHT_SHADE,
                       CENTER_ROOM_IMAGE, CENTER_LABEL,
                       CENTER_NAME, FINAL_ZONE_NAME,
                       BG, BLACK, WHITE, GRAY, YELLOW, GOLD, GREEN, PURPLE, HOME_COLOR, DOOR_COLOR)
@@ -89,12 +89,14 @@ class CenterScene(Scene):
             play = pygame.Rect(0, HUD_HEIGHT, SCREEN_W, SCREEN_H - HUD_HEIGHT)
             for zid, crop in CENTER_MAP_CROPS.items():
                 art = load_image(ZONE_BUILDING_IMAGES.get(zid))
+                size, dx, dy = CENTER_BUILDING_ADJUST.get(zid, (1.0, 0, 0))   # 건물별 크기·위치 미세 조정
                 if art:     # 건물 그림이 있으면 그 그림을 디자인 그림 속 자리에 (밤 색감으로)
-                    img = sk.building(art, crop, sk.tone_of(crop))   # 디자인 그림 속 같은 건물 색감으로
+                    img = sk.building(art, crop, sk.tone_of(crop), fit=1.08 * size)   # 같은 건물 색감으로
                 else:       # 없으면 디자인 그림에서 잘라낸 건물
-                    img = sk.piece(crop, sk.BUILDING_SCALE)
+                    img = sk.piece(crop, sk.BUILDING_SCALE * size)
                 self.building_imgs[zid] = img
-                self.zone_rects[zid] = img.get_rect(center=sk.center_point(crop)).clamp(play)
+                cx, cy = sk.center_point(crop)
+                self.zone_rects[zid] = img.get_rect(center=(cx + dx, cy + dy)).clamp(play)
             self.home_pos = tuple(map(int, sk.center_point(sk.CENTER)))
             room = load_image(CENTER_ROOM_IMAGE)
             self.center_labels = []
@@ -146,6 +148,7 @@ class CenterScene(Scene):
             surf.blit(self.background, (0, HUD_HEIGHT))
         s = self.MINI_SCALE
         mouse = pygame.mouse.get_pos()
+        tags = []                            # 이름표: 맨 나중에(밤 어둠 위에) 그림
         for zid, rect in self.zone_rects.items():
             zone = g.world.zones[zid]
             # 과방에서 각 건물로 이어지는 길
@@ -164,8 +167,7 @@ class CenterScene(Scene):
         if self.center_img:
             r = self.center_img.get_rect(center=self.home_pos)
             surf.blit(self.center_img, r)
-            for img, rect in getattr(self, "center_labels", []):
-                surf.blit(img, rect)
+            tags.extend(getattr(self, "center_labels", []))   # 이름표는 밤 어둠 위에 (밝게 보이게)
         if self.center_img and not self.skin:            # 디자인 그림에는 이름표가 이미 있음
             r = self.center_img.get_rect(center=self.home_pos)
             text = "안전지대 · 회복"
@@ -203,8 +205,6 @@ class CenterScene(Scene):
             label = f"{zid}. {zone.name}"
             if inv.has_key_for(zid):
                 label += " - 키 획득"
-            elif g.is_night and zone.monsters:
-                label += f" - {zone.monster_name} 출몰"
             if self.skin:                    # 디자인 그림의 이름표 틀 + 실제 상태 글자, 건물 위 가운데
                 color = GOLD if inv.has_key_for(zid) else ((205, 175, 255) if g.is_night else (235, 230, 245))
                 tag_img = self.skin.label(g.font.render(label, True, color))
@@ -219,7 +219,7 @@ class CenterScene(Scene):
                     else:
                         tag.left = center.right
                 tag.clamp_ip(pygame.Rect(0, HUD_HEIGHT + 2, SCREEN_W, SCREEN_H))
-                surf.blit(tag_img, tag)
+                tags.append((tag_img, tag))
                 continue
             color = GOLD if inv.has_key_for(zid) else (PURPLE if g.is_night else WHITE)
             img = g.font_small.render(label, True, color)
@@ -228,7 +228,15 @@ class CenterScene(Scene):
             else:                              # 오른쪽 건물: 가운데 과방과 안 겹치게 오른쪽 정렬
                 tag = img.get_rect(bottomright=(rect.right, rect.y - 4))
             tag.top = max(tag.top, HUD_HEIGHT + 2)
-            surf.blit(img, tag)
+            tags.append((img, tag))
+
+        if g.is_night:                       # 밤: 지도(HUD 아래)를 조금 어둡게
+            if not hasattr(self, "_night_shade"):
+                self._night_shade = pygame.Surface((SCREEN_W, SCREEN_H - HUD_HEIGHT), pygame.SRCALPHA)
+                self._night_shade.fill(CENTER_NIGHT_SHADE)
+            surf.blit(self._night_shade, (0, HUD_HEIGHT))
+        for img, rect in tags:
+            surf.blit(img, rect)
 
         exit_zone = next((z for z in g.world.zones.values() if z.exit_open), None)
         if exit_zone:
