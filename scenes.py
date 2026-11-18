@@ -19,7 +19,7 @@ MOVE_KEYS = {
     pygame.K_d: (1, 0), pygame.K_RIGHT: (1, 0),
 }
 LEFT_CLICK, RIGHT_CLICK = 1, 3
-ATTACK_KEYS = (pygame.K_j,)   # 마우스 없이 공격: 바라보는 방향으로
+ATTACK_KEYS = (pygame.K_SPACE,)   # 마우스 없이 공격: 바라보는 방향으로
 
 
 class Scene:

@@ -8,7 +8,7 @@ from settings import (MAZE_COLS, MAZE_ROWS, TILE, ZONE_COUNT, ZONE_LAYOUT, FINAL
                       ZONE_NAMES, MONSTER_NAMES, MONSTER_SPRITES, FINAL_ZONE_NAME, BOSS_NAME,
                       DAY_LOOT, MAX_PICKUPS_PER_ZONE, FINAL_STAGE_POTIONS,
                       COURTYARD_ZONES, BUILDING_BAND_ROWS, COURTYARD_WALL_DENSITY,
-                      COURTYARD_COLS, COURTYARD_ROWS, COURTYARD_STEP, DECOR_PER_ZONE)
+                      COURTYARD_COLS, COURTYARD_ROWS, COURTYARD_STEP, COURTYARD_LOOPS, DECOR_PER_ZONE)
 from items import WeaponPickup, PotionPickup, Spear, Bow
 from entities import Monster, Boss, DIRECTIONS
 from themes import ASSET_DIR, DECOR_SYMBOLS, DEFAULT_THEME, ZONE_THEMES
@@ -113,7 +113,7 @@ class Maze:
         return parents[start], dist[start]
 
     @classmethod
-    def courtyard(cls, cols, rows, rng, band_rows, density, step=3, tries=4):
+    def courtyard(cls, cols, rows, rng, band_rows, density, step=3, tries=4, loops=0):
         """'건물 앞마당' 미로. 위쪽 band_rows 줄은 건물 그림 자리(벽으로 막음),
         그 아래는 담장으로 둘러싼 마당에 ㄱ·ㄴ·T자 벽 조각을 랜덤으로 세운다.
 
@@ -122,6 +122,8 @@ class Maze:
           그래서 "이미 벽으로 이어진 두 기둥 사이"에는 벽을 세우지 않는다. 담장 전체는 한 덩어리로 친다.
           → 길 찾기 없이도 모든 길이 항상 이어져 있다 (그래서 큰 미로도 빠르게 만들어짐).
         - 여러 번 만들어 보고 입구 → 탈출구 경로가 가장 긴 것을 고른다.
+        - 위 방법만 쓰면 길이 '나무 모양'이라 어디서 어디로 가든 길이 딱 하나뿐(갈림길은 전부 막다른 길).
+          그래서 마지막에 벽 loops칸을 뚫어 돌아가는 길(고리)을 만든다 → 길이 여러 갈래가 됨.
         반환: (미로, {"H": 입구, "E": 탈출구})
         """
         top, bottom = band_rows + 1, rows - 2               # 마당 안쪽 첫 줄 / 마지막 줄
@@ -183,10 +185,44 @@ class Maze:
                         grid[y][x] = 1
                         walls += 1
             maze = cls(grid)
+            maze.open_loops(rng, loops, top, bottom, keep)  # 고리를 뚫은 뒤에 길이를 재야 실제 난이도
             length = maze.distances_from(entrance).get(exit_, -1)
             if length > best_len:
                 best, best_len = maze, length
         return best, {"H": entrance, "E": exit_}
+
+    def open_loops(self, rng, count, top, bottom, keep=()):
+        """벽 count칸을 뚫어 길에 고리(돌아가는 길)를 만든다. 길을 막지는 않으므로 연결은 그대로 유지.
+        뚫을 수 있는 칸: 양옆(또는 위아래)이 길이고 반대쪽 두 칸은 벽인 '얇은 벽'. 큰 빈 공간이 생기지 않게.
+        막다른 길 옆의 벽을 먼저 뚫어서 막다른 길이 줄어들게 하고, 뚫은 곳끼리는 3칸 이상 떨어뜨린다."""
+        g, cols = self.grid, self.cols
+
+        def floor(x, y):
+            return 0 <= x < cols and 0 <= y < self.rows and g[y][x] == 0
+
+        def degree(x, y):
+            return sum(floor(x + dx, y + dy) for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)))
+
+        candidates = []
+        for y in range(top, bottom + 1):
+            for x in range(1, cols - 1):
+                if g[y][x] == 0 or (x, y) in keep:
+                    continue
+                horizontal = floor(x - 1, y) and floor(x + 1, y) and not floor(x, y - 1) and not floor(x, y + 1)
+                vertical = floor(x, y - 1) and floor(x, y + 1) and not floor(x - 1, y) and not floor(x + 1, y)
+                if horizontal or vertical:
+                    sides = [(x - 1, y), (x + 1, y)] if horizontal else [(x, y - 1), (x, y + 1)]
+                    near_dead_end = any(degree(*c) == 1 for c in sides)
+                    candidates.append((not near_dead_end, rng.random(), x, y))
+        candidates.sort()                                       # 막다른 길 옆부터, 그다음은 랜덤
+        opened = []
+        for _, _, x, y in candidates:
+            if len(opened) >= count:
+                break
+            if all(abs(x - ox) + abs(y - oy) >= 3 for ox, oy in opened):
+                g[y][x] = 0
+                opened.append((x, y))
+        return opened
 
 
 class Zone:
@@ -217,7 +253,7 @@ class Zone:
         if self.id in COURTYARD_ZONES:   # 건물 + 앞마당 랜덤 미로
             self.maze, markers = Maze.courtyard(COURTYARD_COLS, COURTYARD_ROWS, self.rng,
                                                 BUILDING_BAND_ROWS, COURTYARD_WALL_DENSITY,
-                                                step=COURTYARD_STEP)
+                                                step=COURTYARD_STEP, loops=COURTYARD_LOOPS)
             self.decor = self.place_decor(markers)
         elif map_file:    # 직접 디자인한 맵
             self.maze, markers, self.decor = Maze.from_file(os.path.join(ASSET_DIR, map_file))

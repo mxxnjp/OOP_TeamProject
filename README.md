@@ -89,7 +89,7 @@ python tools/build_exe.py
 |---|---|
 | WASD / 방향키 | 이동 |
 | 좌클릭 | 공격 (마우스 방향) / 과방 지도에서는 건물 입장 |
-| J | 공격 (바라보는 방향, 마우스 없이 플레이) |
+| Space | 공격 (바라보는 방향, 마우스 없이 플레이) |
 | 1, 2 | 창 / 활 선택 |
 | 3 | 물약 (최대 체력 50% 회복) |
 | ESC | 일시정지 |
@@ -122,7 +122,8 @@ python tools/build_exe.py
 - 위쪽 4줄(`settings.BUILDING_BAND_ROWS`)에 그 건물 그림, 아래는 담장 두른 돌바닥 마당
 - 미로: `Maze.courtyard()` — 2칸 간격 기둥 사이에 벽 조각을 랜덤으로 세움 (통로 1칸).
   **Union-Find**로 "이미 벽으로 이어진 두 기둥 사이엔 벽을 안 세움" → 벽이 고리를 못 만들어서 갇힌 곳이 절대 안 생김 (미로 하나 약 10ms).
-  4번 만들어 보고 입구(아래 가운데) → 탈출구(건물 바로 앞) 경로가 가장 긴 것을 고름 (한 화면 기준 약 30걸음). 새 게임마다 바뀜
+  그다음 얇은 벽 7칸을 뚫어 돌아가는 길(고리)을 만듦(`Maze.open_loops`, 개수 `settings.COURTYARD_LOOPS`) → 길이 딱 하나뿐인 미로가 안 되게. 막다른 길 옆 벽부터 뚫어서 막다른 길도 줄어듦 (약 23 → 13개)
+  4번 만들어 보고 입구(아래 가운데) → 탈출구(건물 바로 앞) 경로가 가장 긴 것을 고름 (한 화면 기준 약 25걸음). 새 게임마다 바뀜
 - 조절 (`settings.py`): 크기 `COURTYARD_COLS/ROWS`, 통로 폭 `COURTYARD_STEP` (2 = 1칸 복잡 / 3 = 2칸 널찍), 벽 비율 `COURTYARD_WALL_DENSITY`, 적용 건물 `COURTYARD_ZONES`
 - 그림 (`themes.py`, 건물별 등록은 `ZONE_THEMES`)
   - 4개 건물 모두 `ZoneTileTheme` (`CourtyardTheme` 상속) — 위쪽 건물 띠는 참고 그림 `tiles/campus_mazes.png`에서,

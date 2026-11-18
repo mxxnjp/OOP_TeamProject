@@ -28,6 +28,7 @@ COURTYARD_ROWS = 17              # 세로 칸 수 (COURTYARD_ROWS - BUILDING_BAN
 BUILDING_BAND_ROWS = 4           # 건물 그림이 차지하는 줄 수 (4줄 = 128px)
 COURTYARD_STEP = 2               # 벽 격자 간격. 2 = 통로 1칸(복잡), 3 = 통로 2칸(널찍)
 COURTYARD_WALL_DENSITY = 0.5     # 마당 안쪽에서 벽이 차지하는 최대 비율 (클수록 복잡)
+COURTYARD_LOOPS = 7              # 벽을 몇 칸 뚫어 돌아가는 길을 만들지 (0 = 길이 딱 하나뿐인 미로, 클수록 갈래가 많음)
 DECOR_PER_ZONE = 14              # 타일 세트에 장식이 있는 건물: 막다른 길에 놓을 장식 수 (못 지나감)
 # 직접 디자인한 맵 파일(assets/ 기준). COURTYARD_ZONES에서 빼면 이 맵을 쓴다. 둘 다 없으면 기본 랜덤 미로.
 #   맵 기호: # 벽   . 길   H 입구   E 탈출구   P 화분  T 책상  L 조명 (장식은 지나갈 수 없음)

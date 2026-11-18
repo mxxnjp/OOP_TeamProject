@@ -79,7 +79,7 @@ OOP 수업 자료(1·4·5·6·7·8·9강)에 나온 개념이 우리 코드 어�
 | `get_rect(기준점=)` | `entities.py:209` `midbottom`, `hud.py:22` `center/topleft`, `scenes.py:69` `center` | 강의 p25 topleft/center/midbottom 기준점 |
 | 마우스 클릭 | `scenes.py:82,198` `MOUSEBUTTONDOWN`, `event.button` (1=좌, 3=우), `event.pos` | |
 | `Rect.collidepoint` | `scenes.py:84` 건물 클릭, `scenes.py:359,363` 메뉴 버튼 | |
-| 키보드 `K_` 상수 | `K_1~K_3`, `K_j`, `K_ESCAPE`, `K_F11`, `K_RETURN` | |
+| 키보드 `K_` 상수 | `K_1~K_3`, `K_SPACE`, `K_ESCAPE`, `K_F11`, `K_RETURN` | |
 | `get_pressed()` (누르고 있는 키) | `scenes.py:212` 이동 | 강의 p31 그대로 — 꾹 누르면 계속 이동 |
 | `colliderect` | **없음** | 우리는 칸(타일) 좌표 비교로 충돌 판정 |
 
