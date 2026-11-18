@@ -1,16 +1,68 @@
 # HUFS RUN: 졸업 좀 시켜주세요 (pygame OOP 프로젝트)
 
-처음 한 번만 설치 (Python 3.13 기준. 원래 pygame이 깔려 있으면 먼저 `pip uninstall pygame`):
+## 팀원용: 처음 받기 (clone)
+
+[Git](https://git-scm.com/downloads)과 Python 3.13이 깔려 있어야 함. 원하는 폴더에서 터미널(또는 Git Bash)을 열고:
 
 ```bash
+git clone https://github.com/mxxnjp/OOP_TeamProject.git
+cd OOP_TeamProject
 pip install -r requirements.txt
+python main.py
 ```
 
-실행:
+- `OOP_TeamProject` 폴더가 생기고 그 안에 코드·그림이 전부 받아짐
+- `pip install`은 처음 한 번만. 원래 `pygame`이 깔려 있으면 충돌하니 먼저 `pip uninstall pygame`
+  (이 게임은 `pygame-ce`를 씀. 코드에서는 똑같이 `import pygame`)
+
+## 팀원용: 최신 버전으로 업데이트 (pull)
+
+다른 팀원이 올린 변경을 받을 때. 프로젝트 폴더(`OOP_TeamProject`) 안에서:
+
+```bash
+git pull
+```
+
+- `requirements.txt`가 바뀌었으면 `pip install -r requirements.txt`를 다시 한 번
+- **내가 고친 파일이 있으면 pull이 막힐 수 있음** → 둘 중 하나:
+  - 내 변경을 남길 때: 먼저 커밋하고 pull
+    ```bash
+    git add .
+    git commit -m "무엇을 바꿨는지"
+    git pull
+    ```
+  - 내 변경을 잠깐 치워 둘 때: `git stash` → `git pull` → `git stash pop`
+- pull 후 "CONFLICT"가 뜨면 같은 줄을 둘이 고친 것. 해당 파일에서 `<<<<<<<` ~ `>>>>>>>` 부분을 골라 정리하고
+  `git add 파일` → `git commit`. 헷갈리면 고치지 말고 팀에 물어보기
+
+## 팀원용: 내 작업 올리기 (push)
+
+```bash
+git pull
+git add .
+git commit -m "무엇을 바꿨는지"
+git push
+```
+
+- **push 전에 항상 pull 먼저** (남이 먼저 올린 게 있으면 push가 거절됨)
+- 그림(`assets/`)을 바꿨으면 실행해서 화면 확인 후 올리기
+
+## 실행
 
 ```bash
 python main.py
 ```
+
+실행 파일(.exe) 만들기 — 파이썬이 없는 컴퓨터에서 더블클릭으로 실행 (시연·제출용):
+
+```bash
+pip install -r requirements-dev.txt
+python tools/build_exe.py
+```
+
+→ `dist/HUFS_RUN.exe` 하나에 그림(`assets/`)까지 다 들어감 (약 46MB, 처음 켤 때 3~4초 걸림).
+`dist/`, `build/`는 `.gitignore`에 있어서 GitHub에 안 올라가니 .exe는 카톡·드라이브로 따로 전달.
+오류 메시지를 보고 싶으면 `python tools/build_exe.py --console`.
 
 ## 게임 흐름
 0. **캐릭터 선택**: 남학생 / 여학생 (앞모습 카드, ←→·마우스로 고르고 Enter·클릭). 플레이어도 움직이는 방향을 바라봄

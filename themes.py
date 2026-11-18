@@ -6,12 +6,15 @@
 """
 import json
 import os
+import sys
 
 import pygame
 
 from settings import TILE, WALL, WALL_EDGE, FLOOR, BUILDING_BAND_ROWS
 
-ASSET_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
+# 그림 폴더 위치. .exe(PyInstaller)로 실행하면 함께 묶인 파일이 임시 폴더(sys._MEIPASS)에 풀리므로 거기서 찾음
+_BASE_DIR = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+ASSET_DIR = os.path.join(_BASE_DIR, "assets")
 _image_cache = {}
 
 

@@ -1,0 +1,4 @@
+# 개발·배포용 (게임 실행에는 requirements.txt만 있으면 됨)
+# 설치: pip install -r requirements-dev.txt
+-r requirements.txt
+pyinstaller>=6.0
